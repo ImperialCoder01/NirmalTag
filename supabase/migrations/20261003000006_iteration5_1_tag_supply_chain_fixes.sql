@@ -7,6 +7,12 @@
 -- 1. Schema Alterations & Constraints
 ALTER TABLE tag_batches ADD COLUMN IF NOT EXISTS ward_id UUID REFERENCES mcd_wards(id);
 ALTER TABLE tag_batches ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR UNIQUE;
+ALTER TABLE tags ADD COLUMN IF NOT EXISTS serial_code VARCHAR;
+
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS role VARCHAR;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS metadata JSONB;
+ALTER TABLE audit_logs ALTER COLUMN target_id TYPE TEXT USING target_id::TEXT;
 
 -- Create Database-Safe Serial Sequence Allocator
 CREATE SEQUENCE IF NOT EXISTS tag_serial_seq START WITH 100000 INCREMENT BY 1;
@@ -66,7 +72,7 @@ BEGIN
 
         IF FOUND THEN
             SELECT COUNT(*) INTO v_tags_created FROM tags WHERE batch_id = v_existing_batch.id;
-            SELECT serial_code INTO v_serial_code FROM tags WHERE batch_id = v_existing_batch.id ORDER BY created_at ASC LIMIT 1;
+            SELECT COALESCE(serial_code, canonical_code) INTO v_serial_code FROM tags WHERE batch_id = v_existing_batch.id ORDER BY created_at ASC LIMIT 1;
             
             RETURN jsonb_build_object(
                 'status', 'SUCCESS',
@@ -81,9 +87,9 @@ BEGIN
 
     -- Insert Tag Batch Entry with foreign key ward_id
     INSERT INTO tag_batches (
-        batch_number, total_quantity, issuing_org_id, ward_id, created_by, idempotency_key, created_at
+        batch_number, total_quantity, ward_id, created_by, idempotency_key, created_at
     ) VALUES (
-        p_batch_name, p_quantity, p_ward_id, p_ward_id, v_effective_officer_uid, p_idempotency_key, NOW()
+        p_batch_name, p_quantity, p_ward_id, v_effective_officer_uid, p_idempotency_key, NOW()
     ) RETURNING id INTO v_batch_id;
 
     -- Database-safe serial allocator using sequence tag_serial_seq
@@ -105,7 +111,7 @@ BEGIN
         RAISE EXCEPTION 'Serial Allocation Error: Batch tag creation count mismatch (% vs requested %).', v_tags_created, p_quantity;
     END IF;
 
-    SELECT serial_code INTO v_serial_code FROM tags WHERE batch_id = v_batch_id ORDER BY created_at ASC LIMIT 1;
+    SELECT COALESCE(serial_code, canonical_code) INTO v_serial_code FROM tags WHERE batch_id = v_batch_id ORDER BY created_at ASC LIMIT 1;
 
     -- Immutable Audit Trail Event
     INSERT INTO audit_logs (
@@ -161,7 +167,7 @@ BEGIN
 
     v_effective_role := COALESCE(v_effective_role, 'AUTHENTICATED_USER');
 
-    SELECT status, serial_code INTO v_current_status, v_serial_code
+    SELECT status, COALESCE(serial_code, canonical_code) INTO v_current_status, v_serial_code
     FROM tags
     WHERE id = p_tag_id
     FOR UPDATE;
