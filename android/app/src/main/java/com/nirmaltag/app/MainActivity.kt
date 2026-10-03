@@ -389,7 +389,7 @@ fun UserTypeAuthScreen(
 
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
-                        value = "${selectedRole.label} (${selectedRole.routePath})",
+                        value = selectedRole.label,
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Selected Role") },
@@ -429,7 +429,7 @@ fun UserTypeAuthScreen(
                                             color = if (roleOption == selectedRole) Color(0xFF0D5C3A) else Color(0xFF0F172A)
                                         )
                                         Text(
-                                            text = "${roleOption.portalName} • ${roleOption.routePath}",
+                                            text = roleOption.portalName,
                                             fontSize = 11.sp,
                                             color = Color(0xFF64748B)
                                         )
@@ -445,7 +445,7 @@ fun UserTypeAuthScreen(
                 }
 
                 Text(
-                    text = "Authenticated user will access ${selectedRole.portalName} (${selectedRole.routePath}).",
+                    text = "Authenticated user will access ${selectedRole.portalName}.",
                     fontSize = 11.sp,
                     color = Color(0xFF64748B)
                 )

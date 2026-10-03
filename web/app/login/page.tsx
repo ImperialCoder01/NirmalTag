@@ -113,7 +113,7 @@ export default function LoginPage() {
           >
             {roleOptions.map((opt) => (
               <option key={opt.role} value={opt.role}>
-                {opt.label} ({opt.path})
+                {opt.label}
               </option>
             ))}
           </select>
