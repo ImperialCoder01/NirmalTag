@@ -1,6 +1,49 @@
 import { NextResponse } from "next/server";
 import { authenticateServerRequest } from "@/lib/supabase-auth";
 
+export async function GET(request: Request) {
+  try {
+    let authResult;
+    try {
+      authResult = await authenticateServerRequest(request);
+    } catch (authErr: any) {
+      return NextResponse.json({
+        success: false,
+        code: "UNAUTHORIZED",
+        message: authErr.message || "Missing or invalid identity token.",
+      }, { status: 401 });
+    }
+
+    const { supabaseUserClient } = authResult;
+
+    const { data: batches, error: dbError } = await supabaseUserClient
+      .from("tag_batches")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (dbError) {
+      return NextResponse.json({
+        success: false,
+        code: "FETCH_FAILED",
+        message: `Failed to fetch tag batches: ${dbError.message}`,
+      }, { status: 422 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      code: "BATCHES_FETCHED",
+      batches: batches || [],
+    });
+  } catch (error: any) {
+    return NextResponse.json({
+      success: false,
+      code: "SERVER_ERROR",
+      message: error.message || "Failed to fetch tag batches due to server error.",
+    }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     let authResult;
