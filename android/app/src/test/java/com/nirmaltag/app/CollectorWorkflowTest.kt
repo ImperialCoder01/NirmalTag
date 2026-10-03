@@ -25,10 +25,10 @@ class CollectorWorkflowTest {
 
     @Test
     fun testTagTypeParsing() {
-        assertEquals("SANITARY", TagValidationUtil.parseTagType("NT-SAN-2026-8012"))
-        assertEquals("HAZARDOUS", TagValidationUtil.parseTagType("NT-HAZ-2026-8012"))
-        assertEquals("RECYCLABLE", TagValidationUtil.parseTagType("NT-REC-2026-8012"))
-        assertEquals("UNKNOWN", TagValidationUtil.parseTagType("UNKNOWN_TAG"))
+        assertEquals("SANITARY", TagValidationUtil.parseTagTypeUX("NT-SAN-2026-8012"))
+        assertEquals("HAZARDOUS", TagValidationUtil.parseTagTypeUX("NT-HAZ-2026-8012"))
+        assertEquals("RECYCLABLE", TagValidationUtil.parseTagTypeUX("NT-REC-2026-8012"))
+        assertEquals("SANITARY", TagValidationUtil.parseTagTypeUX("UNKNOWN_TAG"))
     }
 
     @Test
