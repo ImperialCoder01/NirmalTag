@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { authenticateServerRequest } from "@/lib/supabase-auth";
 
 export async function POST(request: Request) {
@@ -15,7 +14,7 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
 
-    const { user: firebaseUser } = authResult;
+    const { user: firebaseUser, supabaseUserClient } = authResult;
     const collectorUid = firebaseUser.uid;
 
     const body = await request.json().catch(() => ({}));
@@ -31,9 +30,9 @@ export async function POST(request: Request) {
 
     const activeIdempotencyKey = idempotencyKey || `SYNC-${pickupId}-${tagId}`;
 
-    // Execute PostgreSQL transaction RPC: process_verified_pickup_transaction_v2
+    // Execute PostgreSQL transaction RPC using RLS-scoped user client (passes Bearer JWT to Supabase)
     // NO CLIENT-SUPPLIED REWARD AMOUNTS OR HOUSEHOLD IDS TRUSTED!
-    const { data: dbResult, error: dbError } = await supabaseAdmin.rpc(
+    const { data: dbResult, error: dbError } = await supabaseUserClient.rpc(
       "process_verified_pickup_transaction_v2",
       {
         p_pickup_id: pickupId,

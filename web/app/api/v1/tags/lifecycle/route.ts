@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { authenticateServerRequest } from "@/lib/supabase-auth";
 
 export async function POST(request: Request) {
@@ -15,7 +14,7 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
 
-    const { user: firebaseUser } = authResult;
+    const { user: firebaseUser, supabaseUserClient } = authResult;
     const actorUid = firebaseUser.uid;
 
     const body = await request.json().catch(() => ({}));
@@ -29,30 +28,14 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Resolve actor's DB role
-    const { data: userRoleRecords } = await supabaseAdmin
-      .from("user_roles")
-      .select("roles(name)")
-      .eq("user_id", actorUid);
-
-    let actorRole = "AUTHENTICATED_USER";
-    if (userRoleRecords && userRoleRecords.length > 0) {
-      const firstRec = userRoleRecords[0] as any;
-      if (Array.isArray(firstRec.roles)) {
-        actorRole = firstRec.roles[0]?.name || actorRole;
-      } else if (firstRec.roles?.name) {
-        actorRole = firstRec.roles.name;
-      }
-    }
-
-    // Invoke PostgreSQL transition function: transition_tag_state
-    const { data: transitionResult, error: dbError } = await supabaseAdmin.rpc(
+    // Execute PostgreSQL procedure: transition_tag_state using RLS-scoped user client
+    const { data: transitionResult, error: dbError } = await supabaseUserClient.rpc(
       "transition_tag_state",
       {
         p_tag_id: tagId,
         p_new_status: newStatus,
         p_actor_profile_id: actorUid,
-        p_actor_role: actorRole,
+        p_actor_role: null,
         p_reason: reason || "API Lifecycle Request",
         p_idempotency_key: idempotencyKey || `TAG-TRANS-${tagId}-${Date.now()}`,
       }

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { authenticateServerRequest } from "@/lib/supabase-auth";
 
 export async function POST(request: Request) {
@@ -15,7 +14,7 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
 
-    const { user: firebaseUser } = authResult;
+    const { user: firebaseUser, supabaseUserClient } = authResult;
     const officerUid = firebaseUser.uid;
 
     const body = await request.json().catch(() => ({}));
@@ -25,9 +24,8 @@ export async function POST(request: Request) {
     const name = batchName || `BATCH-2026-${Math.floor(100 + Math.random() * 900)}`;
     const activeIdempotencyKey = idempotencyKey || `BATCH-GEN-${name}-${Date.now()}`;
 
-    // Execute PostgreSQL procedure: create_tag_batch_and_records
-    // Generates actual tag_batch and N actual tag records in PostgreSQL DB!
-    const { data: dbResult, error: dbError } = await supabaseAdmin.rpc(
+    // Execute PostgreSQL procedure: create_tag_batch_and_records using RLS-scoped user client
+    const { data: dbResult, error: dbError } = await supabaseUserClient.rpc(
       "create_tag_batch_and_records",
       {
         p_batch_name: name,

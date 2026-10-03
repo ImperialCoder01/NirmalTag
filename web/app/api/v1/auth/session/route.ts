@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authErr.message || "Unauthorized" }, { status: 401 });
     }
 
-    const { user: firebaseUser } = authResult;
+    const { user: firebaseUser, supabaseUserClient } = authResult;
     const firebaseUid = firebaseUser.uid;
     const email = firebaseUser.email;
     const fullName = firebaseUser.fullName;
@@ -19,8 +19,8 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const requestedRole = body.requestedRole;
 
-    // 1. Fetch profile from Supabase
-    let { data: profile } = await supabaseAdmin
+    // 1. Fetch profile from Supabase (Service role used exclusively for initial profile provisioning)
+    let { data: profile } = await supabaseUserClient
       .from("profiles")
       .select("*")
       .eq("firebase_uid", firebaseUid)
@@ -46,19 +46,21 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Fetch assigned roles from user_roles junction table (AUTHORITATIVE DB TRUTH)
-    const { data: userRoleRecords } = await supabaseAdmin
+    // 2. Fetch assigned roles from user_roles junction table using RLS-scoped user client
+    const { data: userRoleRecords } = await supabaseUserClient
       .from("user_roles")
       .select("roles(name)")
       .eq("user_id", profile.id);
 
     let assignedRoles: string[] = [];
     if (userRoleRecords && userRoleRecords.length > 0) {
-      assignedRoles = userRoleRecords.map((ur: any) => ur.roles?.name).filter(Boolean);
+      assignedRoles = userRoleRecords.map((ur: any) => {
+        if (Array.isArray(ur.roles)) return ur.roles[0]?.name;
+        return ur.roles?.name;
+      }).filter(Boolean);
     }
 
     // STRICT ROLE AUTHORIZATION: If account has no role in database, return PENDING_AUTHORIZATION!
-    // (NO domain suffix auto-elevation, NO silent HOUSEHOLD fallback!)
     if (assignedRoles.length === 0) {
       return NextResponse.json({
         authenticated: true,
@@ -84,21 +86,21 @@ export async function POST(request: Request) {
       }, { status: 403 });
     }
 
-    // 3. Resolve Database Scope Boundaries
+    // 3. Resolve Database Scope Boundaries via RLS-scoped client
     let scope: any = { level: activeRole === "SYSTEM_ADMIN" ? "SYSTEM" : "UNBOUND" };
 
     if (activeRole === "HOUSEHOLD") {
-      const { data: hh } = await supabaseAdmin.from("households").select("id, ward_id, rwa_id").eq("user_id", profile.id).single();
+      const { data: hh } = await supabaseUserClient.from("households").select("id, ward_id, rwa_id").eq("user_id", profile.id).single();
       if (hh) {
         scope = { level: "HOUSEHOLD", householdId: hh.id, wardId: hh.ward_id, rwaId: hh.rwa_id };
       }
     } else if (activeRole === "COLLECTOR") {
-      const { data: col } = await supabaseAdmin.from("collectors").select("id, assigned_ward_id").eq("user_id", profile.id).single();
+      const { data: col } = await supabaseUserClient.from("collectors").select("id, assigned_ward_id").eq("user_id", profile.id).single();
       if (col) {
         scope = { level: "WARD", collectorId: col.id, wardId: col.assigned_ward_id };
       }
     } else if (activeRole === "RWA_ADMIN" || activeRole === "BWG_ADMIN" || activeRole === "TAG_OFFICER" || activeRole === "MCD_OFFICER") {
-      const { data: off } = await supabaseAdmin.from("officer_profiles").select("id, organization_id").eq("user_id", profile.id).single();
+      const { data: off } = await supabaseUserClient.from("officer_profiles").select("id, organization_id").eq("user_id", profile.id).single();
       if (off) {
         scope = { level: "ORGANIZATION", officerId: off.id, organizationId: off.organization_id };
       }
