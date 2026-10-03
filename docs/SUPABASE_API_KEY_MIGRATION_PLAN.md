@@ -11,7 +11,7 @@
 
 The migration from the legacy Supabase anon JWT (`eyJ...`) to the new **Supabase Publishable Key** (`sb_publishable_...`) has been completed across all Android and Web clients in the NirmalTag codebase.
 
-- **Publishable Key**: `sb_publishable_MVBto2fM-eKyqT_R5A-g7Q_GDzJKswE`
+- **Publishable Key**: `<REDACTED>`
 - **Gradle & Build Configuration**: Supplied locally via git-ignored `android/local.properties` (`supabase.publishable.key`) and injected into Android Kotlin code via `BuildConfig.SUPABASE_PUBLISHABLE_KEY`.
 - **Web Configuration**: Supplied locally via git-ignored `web/.env.local` (`NEXT_PUBLIC_SUPABASE_ANON_KEY`).
 - **Legacy Anon JWT Search**: **ZERO** active references remain in current source code files.

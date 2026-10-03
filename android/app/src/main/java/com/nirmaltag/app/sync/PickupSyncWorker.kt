@@ -154,9 +154,7 @@ class PickupSyncWorker(
         }
 
         val syncEndpoint = "https://ubphrqumpqdifupwbvpe.supabase.co/rest/v1/rpc/process_verified_pickup_transaction_v2"
-        val supabaseApiKey = com.nirmaltag.app.BuildConfig.SUPABASE_PUBLISHABLE_KEY.ifEmpty {
-            "sb_publishable_MVBto2fM-eKyqT_R5A-g7Q_GDzJKswE"
-        }
+        val supabaseApiKey = com.nirmaltag.app.BuildConfig.SUPABASE_PUBLISHABLE_KEY
 
         try {
             val url = URL(syncEndpoint)

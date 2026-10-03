@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { auth } from "./firebase";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ubphrqumpqdifupwbvpe.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "demo-anon-key";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "demo-anon-key";
 
 /**
  * Public Authenticated Supabase Browser Client.
