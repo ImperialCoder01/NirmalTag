@@ -21,6 +21,13 @@ android {
         }
     }
 
+    applicationVariants.all {
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "NirmalTag.apk"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -47,6 +54,12 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
     }
 }
 

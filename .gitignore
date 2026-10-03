@@ -1,5 +1,3 @@
-# NirmalTag Monorepo Root Git Ignore
-
 # Node / Web dependencies & builds
 web/node_modules/
 web/.next/
@@ -18,6 +16,8 @@ android/.idea/
 android/*.iml
 android/app/*.keystore
 android/app/*.jks
+android/jdk17/
+*.zip
 
 # Supabase local environment
 supabase/.env

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth, UserRole } from "@/lib/auth-context";
-import { ShieldCheck, User, LogOut, ChevronDown } from "lucide-react";
+import { ShieldCheck, User, UserPlus, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 export default function Navbar() {
@@ -21,14 +21,14 @@ export default function Navbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand Logo & Title */}
         <Link href="/" className="flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-emerald-600 shadow-md transition-transform group-hover:scale-105">
             <Image
               src="/logo.jpg"
-              alt="NirmalTag Logo"
+              alt="NirmalTag Brand Logo"
               width={40}
               height={40}
               className="object-cover w-full h-full"
@@ -44,11 +44,12 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Role Portal Shortcuts & Role Selector */}
-        <div className="flex items-center gap-4">
+        {/* Role Switcher */}
+        <div className="flex items-center gap-3">
           <div className="relative">
             <button
               onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+              aria-label="Role Scope Selector"
               className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors"
             >
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
@@ -79,8 +80,8 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Quick Nav Links */}
-          <nav className="hidden md:flex items-center gap-3 text-xs font-medium text-slate-600">
+          {/* Nav Links */}
+          <nav className="hidden md:flex items-center gap-3 text-xs font-medium text-slate-700">
             <Link href="/household" className="hover:text-emerald-600 transition-colors">Household</Link>
             <Link href="/collector" className="hover:text-emerald-600 transition-colors">Collector</Link>
             <Link href="/tag-officer" className="hover:text-emerald-600 transition-colors">Tag Officer</Link>
@@ -90,13 +91,25 @@ export default function Navbar() {
             <Link href="/admin" className="hover:text-emerald-600 transition-colors">Admin</Link>
           </nav>
 
-          <Link
-            href="/login"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
-          >
-            <User className="w-3.5 h-3.5" />
-            <span>Sign In</span>
-          </Link>
+          {/* Auth Action Buttons */}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/login"
+              aria-label="Sign In to Account"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </Link>
+            <Link
+              href="/register"
+              aria-label="Create New Account"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white brand-gradient hover:opacity-95 rounded-lg shadow-sm transition-opacity"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Sign Up</span>
+            </Link>
+          </div>
         </div>
       </div>
     </header>
