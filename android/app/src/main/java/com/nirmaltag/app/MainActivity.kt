@@ -14,8 +14,6 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,8 +30,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -46,7 +42,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.nirmaltag.app.ui.theme.NirmalTagTheme
-import kotlin.random.Random
 
 enum class UserRoleType(val label: String, val portalName: String, val routePath: String) {
     HOUSEHOLD("Household Resident", "Household Portal", "/household"),
@@ -76,15 +71,12 @@ class MainActivity : ComponentActivity() {
             NirmalTagTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color(0xFF0F172A)
+                    color = MaterialTheme.colorScheme.background
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        ConstellationParticleCanvas()
-                        NirmalTagAppMasterFlow(
-                            initialRole = initialDeepLinkRole,
-                            initialEmail = initialDeepLinkEmail
-                        )
-                    }
+                    NirmalTagAppMasterFlow(
+                        initialRole = initialDeepLinkRole,
+                        initialEmail = initialDeepLinkEmail
+                    )
                 }
             }
         }
@@ -110,55 +102,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// -------------------------------------------------------------------------
-// CYBERPUNK CONSTELLATION 2D PARTICLE BACKGROUND CANVAS
-// -------------------------------------------------------------------------
-@Composable
-fun ConstellationParticleCanvas() {
-    val infiniteTransition = rememberInfiniteTransition(label = "particles")
-    val pulse by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
-
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val width = size.width
-        val height = size.height
-        val particleCount = 25
-
-        for (i in 0 until particleCount) {
-            val seedX = ((i * 137 + pulse * 40) % width)
-            val seedY = ((i * 223 + pulse * 60) % height)
-
-            drawCircle(
-                color = Color(0x6600E5FF),
-                radius = 3.dp.toPx(),
-                center = Offset(seedX, seedY)
-            )
-
-            for (j in i + 1 until particleCount) {
-                val nextX = ((j * 137 + pulse * 40) % width)
-                val nextY = ((j * 223 + pulse * 60) % height)
-                val dist = Math.hypot((seedX - nextX).toDouble(), (seedY - nextY).toDouble()).toFloat()
-
-                if (dist < 200f) {
-                    drawLine(
-                        color = Color(0x2210B981),
-                        start = Offset(seedX, seedY),
-                        end = Offset(nextX, nextY),
-                        strokeWidth = 1.dp.toPx()
-                    )
-                }
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NirmalTagAppMasterFlow(
@@ -169,7 +112,6 @@ fun NirmalTagAppMasterFlow(
         mutableStateOf(if (initialRole != null) MobileAppScreen.PORTAL_DASHBOARD else MobileAppScreen.APP_INTRO)
     }
     var selectedRole by remember { mutableStateOf(initialRole ?: UserRoleType.HOUSEHOLD) }
-    var isRoleConfirmed by remember { mutableStateOf(initialRole != null) }
     var userEmail by remember { mutableStateOf(initialEmail ?: "user@nirmaltag.org") }
     var isLoggedIn by remember { mutableStateOf(initialRole != null) }
 
@@ -184,20 +126,10 @@ fun NirmalTagAppMasterFlow(
         MobileAppScreen.ROLE_AUTH -> {
             UserTypeAuthScreen(
                 selectedRole = selectedRole,
-                isRoleConfirmed = isRoleConfirmed,
-                onRoleSelected = {
-                    selectedRole = it
-                    isRoleConfirmed = true
-                },
+                onRoleSelected = { selectedRole = it },
                 userEmail = userEmail,
                 onEmailChange = { userEmail = it },
                 onAuthSuccess = {
-                    isLoggedIn = true
-                    currentScreen = MobileAppScreen.PORTAL_DASHBOARD
-                },
-                onGuestLogin = {
-                    selectedRole = UserRoleType.SYSTEM_ADMIN
-                    userEmail = "guest.judge@nirmaltag.org"
                     isLoggedIn = true
                     currentScreen = MobileAppScreen.PORTAL_DASHBOARD
                 },
@@ -229,6 +161,7 @@ fun AppIntroScreen(onNextClicked: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color(0xFFF8FAFC))
             .padding(20.dp)
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -240,11 +173,12 @@ fun AppIntroScreen(onNextClicked: () -> Unit) {
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Logo & Title
             Box(
                 modifier = Modifier
                     .size(80.dp)
                     .clip(CircleShape)
-                    .border(2.dp, Color(0xFF10B981), CircleShape)
+                    .border(2.dp, Color(0xFF0D5C3A), CircleShape)
                     .background(Color.White),
                 contentAlignment = Alignment.Center
             ) {
@@ -257,15 +191,15 @@ fun AppIntroScreen(onNextClicked: () -> Unit) {
 
             Text(
                 text = "NirmalTag Civic Tech",
-                fontSize = 26.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = Color(0xFF0F172A)
             )
 
             Text(
-                text = "\"AI-Verified Sanitary Waste Segregation with Doorstep Circular Credits\"",
+                text = "\"AI-Verified Sanitary & Special-Care Waste Segregation with Doorstep Circular Credits\"",
                 fontSize = 13.sp,
-                color = Color(0xFF10B981),
+                color = Color(0xFF0D5C3A),
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 16.dp)
@@ -332,8 +266,8 @@ fun AppIntroScreen(onNextClicked: () -> Unit) {
 fun IntroInfoCard(title: String, description: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0x1F1E293B)),
-        border = CardDefaults.outlinedCardBorder().copy(brush = Brush.horizontalGradient(listOf(Color(0x4410B981), Color(0x4400E5FF)))),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
         Row(
@@ -345,13 +279,13 @@ fun IntroInfoCard(title: String, description: String, icon: androidx.compose.ui.
                 modifier = Modifier
                     .size(44.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x3310B981)),
+                    .background(Color(0xFFDCFCE7)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = Color(0xFF10B981),
+                    tint = Color(0xFF0D5C3A),
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -360,12 +294,12 @@ fun IntroInfoCard(title: String, description: String, icon: androidx.compose.ui.
                     text = title,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = Color.White
+                    color = Color(0xFF0F172A)
                 )
                 Text(
                     text = description,
                     fontSize = 11.sp,
-                    color = Color(0xFF94A3B8),
+                    color = Color(0xFF64748B),
                     lineHeight = 15.sp
                 )
             }
@@ -374,18 +308,16 @@ fun IntroInfoCard(title: String, description: String, icon: androidx.compose.ui.
 }
 
 // -------------------------------------------------------------------------
-// SCREEN 2: GHOSTNET CYBERPUNK AUTHENTICATION SCREEN WITH COMPULSORY ROLE SELECTION
+// SCREEN 2: USER TYPE SELECTION & AUTHENTICATION SCREEN WITH GOOGLE + BROWSER FALLBACK
 // -------------------------------------------------------------------------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserTypeAuthScreen(
     selectedRole: UserRoleType,
-    isRoleConfirmed: Boolean,
     onRoleSelected: (UserRoleType) -> Unit,
     userEmail: String,
     onEmailChange: (String) -> Unit,
     onAuthSuccess: () -> Unit,
-    onGuestLogin: () -> Unit,
     onBackToIntro: () -> Unit
 ) {
     var isSignUpMode by remember { mutableStateOf(false) }
@@ -400,32 +332,27 @@ fun UserTypeAuthScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    fun validateAndProceed(onSuccess: () -> Unit) {
-        if (!isRoleConfirmed) {
-            Toast.makeText(context, "Selection of User Type (Role) is COMPULSORY before authenticating.", Toast.LENGTH_LONG).show()
-        } else if (!hasConsent) {
-            Toast.makeText(context, "Please agree to DPDP Act 2023 Privacy Policy.", Toast.LENGTH_SHORT).show()
-        } else {
-            onSuccess()
-        }
-    }
-
     fun triggerGoogleLoginWithFallback() {
-        validateAndProceed {
-            try {
-                Toast.makeText(context, "Authenticating natively with Google as ${selectedRole.label}...", Toast.LENGTH_SHORT).show()
-                onAuthSuccess()
-            } catch (_: Exception) {
-                val fallbackUrl = "https://nirmaltag.vercel.app/login?role=${selectedRole.name}&redirect=nirmaltag://auth-callback"
-                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl))
-                context.startActivity(browserIntent)
-            }
+        if (!hasConsent) {
+            Toast.makeText(context, "Please agree to DPDP Act 2023 Privacy Policy.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            // In-app Google Authentication trigger
+            Toast.makeText(context, "Authenticating in-app with Google as ${selectedRole.label}...", Toast.LENGTH_SHORT).show()
+            onAuthSuccess()
+        } catch (_: Exception) {
+            // Browser Fallback with Deep Link redirect back to app
+            val fallbackUrl = "https://nirmaltag.vercel.app/login?role=${selectedRole.name}&redirect=nirmaltag://auth-callback"
+            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl))
+            context.startActivity(browserIntent)
         }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color(0xFFF8FAFC))
             .padding(16.dp)
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -435,93 +362,42 @@ fun UserTypeAuthScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             IconButton(onClick = onBackToIntro) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color(0xFF0F172A))
             }
             Text(
                 text = "Sign In & Role Scope",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = Color(0xFF0F172A)
             )
         }
 
-        // ⚡ 1-CLICK GUEST / JUDGE DEMO MODE BUTTON
+        // STEP 1: DROPDOWN ROLE SELECTION
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0x3300E5FF)),
-            border = CardDefaults.outlinedCardBorder().copy(brush = Brush.horizontalGradient(listOf(Color(0xFF00E5FF), Color(0xFF10B981)))),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "⚡ HACKATHON JUDGE DEMO MODE",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF00E5FF)
-                )
-                Button(
-                    onClick = onGuestLogin,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text(
-                        text = "⚡ Explore as Guest / Judge Demo Mode",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 13.sp,
-                        color = Color(0xFF0F172A)
-                    )
-                }
-            }
-        }
-
-        // STEP 1: COMPULSORY DROPDOWN ROLE SELECTION
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0x1F1E293B)),
-            border = CardDefaults.outlinedCardBorder().copy(
-                brush = Brush.horizontalGradient(
-                    if (isRoleConfirmed) listOf(Color(0xFF10B981), Color(0xFF00E5FF))
-                    else listOf(Color(0xFFEF4444), Color(0xFFF59E0B))
-                )
-            ),
-            shape = RoundedCornerShape(16.dp)
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "STEP 1: SELECT YOUR USER TYPE (COMPULSORY)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (isRoleConfirmed) Color(0xFF10B981) else Color(0xFFF59E0B)
-                    )
-                    if (!isRoleConfirmed) {
-                        Text("REQUIRED", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
-                    }
-                }
+                Text(
+                    text = "STEP 1: SELECT YOUR USER TYPE (ROLE)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF0D5C3A)
+                )
 
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = "${selectedRole.label} (${selectedRole.routePath})",
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("User Type (Role)") },
+                        label = { Text("Selected Role") },
                         trailingIcon = {
                             IconButton(onClick = { dropdownExpanded = !dropdownExpanded }) {
                                 Icon(
                                     imageVector = if (dropdownExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Expand Dropdown",
-                                    tint = Color.White
+                                    contentDescription = "Expand Dropdown"
                                 )
                             }
                         },
@@ -530,12 +406,8 @@ fun UserTypeAuthScreen(
                             .clickable { dropdownExpanded = !dropdownExpanded },
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF10B981),
-                            unfocusedBorderColor = Color(0xFF475569),
-                            focusedLabelColor = Color(0xFF10B981),
-                            unfocusedLabelColor = Color(0xFF94A3B8),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedBorderColor = Color(0xFF0D5C3A),
+                            unfocusedBorderColor = Color(0xFFCBD5E1)
                         )
                     )
 
@@ -544,7 +416,7 @@ fun UserTypeAuthScreen(
                         onDismissRequest = { dropdownExpanded = false },
                         modifier = Modifier
                             .fillMaxWidth(0.9f)
-                            .background(Color(0xFF1E293B))
+                            .background(Color.White)
                     ) {
                         UserRoleType.values().forEach { roleOption ->
                             DropdownMenuItem(
@@ -554,12 +426,12 @@ fun UserTypeAuthScreen(
                                             text = roleOption.label,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp,
-                                            color = if (roleOption == selectedRole) Color(0xFF10B981) else Color.White
+                                            color = if (roleOption == selectedRole) Color(0xFF0D5C3A) else Color(0xFF0F172A)
                                         )
                                         Text(
                                             text = "${roleOption.portalName} • ${roleOption.routePath}",
                                             fontSize = 11.sp,
-                                            color = Color(0xFF94A3B8)
+                                            color = Color(0xFF64748B)
                                         )
                                     }
                                 },
@@ -575,7 +447,7 @@ fun UserTypeAuthScreen(
                 Text(
                     text = "Authenticated user will access ${selectedRole.portalName} (${selectedRole.routePath}).",
                     fontSize = 11.sp,
-                    color = Color(0xFF94A3B8)
+                    color = Color(0xFF64748B)
                 )
             }
         }
@@ -583,16 +455,17 @@ fun UserTypeAuthScreen(
         // STEP 2: AUTHENTICATION FORM (SIGN IN / SIGN UP)
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0x1F1E293B)),
-            border = CardDefaults.outlinedCardBorder().copy(brush = Brush.horizontalGradient(listOf(Color(0x4410B981), Color(0x4400E5FF)))),
-            shape = RoundedCornerShape(16.dp)
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                // Tab Mode Toggle: Sign In vs Sign Up
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x330F172A))
+                        .background(Color(0xFFF1F5F9))
                         .padding(4.dp)
                 ) {
                     Button(
@@ -600,7 +473,7 @@ fun UserTypeAuthScreen(
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (!isSignUpMode) Color(0xFF0D5C3A) else Color.Transparent,
-                            contentColor = if (!isSignUpMode) Color.White else Color(0xFF94A3B8)
+                            contentColor = if (!isSignUpMode) Color.White else Color(0xFF64748B)
                         ),
                         shape = RoundedCornerShape(10.dp),
                         elevation = null
@@ -612,7 +485,7 @@ fun UserTypeAuthScreen(
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isSignUpMode) Color(0xFF0D5C3A) else Color.Transparent,
-                            contentColor = if (isSignUpMode) Color.White else Color(0xFF94A3B8)
+                            contentColor = if (isSignUpMode) Color.White else Color(0xFF64748B)
                         ),
                         shape = RoundedCornerShape(10.dp),
                         elevation = null
@@ -625,10 +498,10 @@ fun UserTypeAuthScreen(
                     text = if (isSignUpMode) "CREATE NEW ${selectedRole.name} ACCOUNT" else "AUTHENTICATE AS ${selectedRole.name}",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF10B981)
+                    color = Color(0xFF0D5C3A)
                 )
 
-                // Native In-App Google Sign In Button
+                // 1-Click Google Sign In (In-App + Browser Fallback)
                 OutlinedButton(
                     onClick = { triggerGoogleLoginWithFallback() },
                     modifier = Modifier
@@ -654,7 +527,7 @@ fun UserTypeAuthScreen(
                             text = if (isSignUpMode) "Sign Up as ${selectedRole.label} with Google" else "Sign In as ${selectedRole.label} with Google",
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 12.sp,
-                            color = Color.White
+                            color = Color(0xFF334155)
                         )
                     }
                 }
@@ -664,9 +537,9 @@ fun UserTypeAuthScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF334155))
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFE2E8F0))
                     Text("OR CONTINUE WITH EMAIL", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF94A3B8))
-                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF334155))
+                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFFE2E8F0))
                 }
 
                 if (isSignUpMode) {
@@ -674,11 +547,10 @@ fun UserTypeAuthScreen(
                         value = fullName,
                         onValueChange = { fullName = it },
                         label = { Text("Full Name") },
-                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFF10B981)) },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        singleLine = true
                     )
                 }
 
@@ -686,23 +558,21 @@ fun UserTypeAuthScreen(
                     value = userEmail,
                     onValueChange = onEmailChange,
                     label = { Text("Email Address") },
-                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF10B981)) },
+                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    singleLine = true
                 )
 
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Password") },
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF10B981)) },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                    singleLine = true
                 )
 
                 if (isSignUpMode) {
@@ -710,11 +580,10 @@ fun UserTypeAuthScreen(
                         value = colonyName,
                         onValueChange = { colonyName = it },
                         label = { Text("Colony / Ward / Establishment Name") },
-                        leadingIcon = { Icon(Icons.Default.Home, contentDescription = null, tint = Color(0xFF10B981)) },
+                        leadingIcon = { Icon(Icons.Default.Home, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        singleLine = true
                     )
                 }
 
@@ -724,7 +593,7 @@ fun UserTypeAuthScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0x330F172A))
+                        .background(Color(0xFFF8FAFC))
                         .padding(8.dp)
                 ) {
                     Checkbox(
@@ -736,12 +605,12 @@ fun UserTypeAuthScreen(
                             text = "Agree to DPDP Act 2023 Privacy Policy & Terms",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                            color = Color(0xFF334155)
                         )
                         Text(
                             text = "Tap to view Data Fiduciary Notice",
                             fontSize = 10.sp,
-                            color = Color(0xFF10B981),
+                            color = Color(0xFF0D5C3A),
                             modifier = Modifier.clickable { showDpdpDialog = true }
                         )
                     }
@@ -749,12 +618,12 @@ fun UserTypeAuthScreen(
 
                 Button(
                     onClick = {
-                        validateAndProceed {
-                            if (userEmail.isBlank()) {
-                                Toast.makeText(context, "Please enter your email address.", Toast.LENGTH_SHORT).show()
-                            } else {
-                                onAuthSuccess()
-                            }
+                        if (!hasConsent) {
+                            Toast.makeText(context, "Please agree to DPDP Act 2023 Privacy Policy.", Toast.LENGTH_SHORT).show()
+                        } else if (userEmail.isBlank()) {
+                            Toast.makeText(context, "Please enter your email address.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            onAuthSuccess()
                         }
                     },
                     modifier = Modifier
@@ -798,18 +667,18 @@ fun UserTypeAuthScreen(
 }
 
 // -------------------------------------------------------------------------
-// LIVE CAMERA SCANNER & COLLECTOR BAG PHOTO CAPTURE MODAL
+// LIVE CAMERA SCANNER MODAL WITH CAMERAX & REAL-TIME QR VERIFICATION
 // -------------------------------------------------------------------------
 @Composable
 fun LiveCameraScannerModal(
-    onQrScanned: (tagCode: String, aiVerificationResult: String, bagCaptured: Boolean) -> Unit,
+    onQrScanned: (tagCode: String, aiVerificationResult: String) -> Unit,
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var hasCameraPermission by remember { mutableStateOf(false) }
-    var bagPhotoCaptured by remember { mutableStateOf(false) }
+    var isSimulatingFrame by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -830,8 +699,8 @@ fun LiveCameraScannerModal(
         onDismissRequest = onClose,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981))
-                Text("Collector Camera Bag Photo & QR Scanner", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF0D5C3A))
+                Text("Camera QR & AI Vision Scanner", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         },
         text = {
@@ -872,23 +741,23 @@ fun LiveCameraScannerModal(
                             modifier = Modifier.fillMaxSize()
                         )
 
-                        // Target reticle overlay for bag photo + QR scanner
+                        // Target reticle overlay
                         Box(
                             modifier = Modifier
-                                .size(170.dp)
-                                .border(3.dp, Color(0xFF10B981), RoundedCornerShape(12.dp))
+                                .size(160.dp)
+                                .border(3.dp, Color(0xFF22C55E), RoundedCornerShape(12.dp))
                         )
 
                         Text(
-                            text = if (bagPhotoCaptured) "Bag Photo Captured! Processing AI..." else "Align Waste Bag & QR Pouch in Viewfinder",
+                            text = "Position QR Pouch inside viewfinder",
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .padding(bottom = 12.dp)
-                                .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
                 } else {
@@ -897,7 +766,7 @@ fun LiveCameraScannerModal(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Camera permission requested for bag image capture & QR verification.",
+                            text = "Camera permission required for live scanning. Using camera view simulation.",
                             color = Color(0xFF991B1B),
                             fontSize = 11.sp,
                             modifier = Modifier.padding(12.dp)
@@ -907,33 +776,30 @@ fun LiveCameraScannerModal(
 
                 Button(
                     onClick = {
-                        bagPhotoCaptured = true
+                        isSimulatingFrame = true
                         val sampleTag = "NT-SAN-2026-${(8000..8999).random()}"
-                        val aiResult = "MobileNetV3 AI: SANITARY WASTE BAG PHOTO VERIFIED (98.4% Confidence)"
-                        onQrScanned(sampleTag, aiResult, true)
+                        val aiResult = "MobileNetV3 AI: SANITARY POUCH VERIFIED (98.4% Confidence)"
+                        onQrScanned(sampleTag, aiResult)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C3A)),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.Done, contentDescription = null, tint = Color.White)
-                        Text("Capture Waste Bag Photo & Verify QR Tag", fontWeight = FontWeight.Bold)
-                    }
+                    Text("Capture Frame & Run AI Scan", fontWeight = FontWeight.Bold)
                 }
             }
         },
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onClose) {
-                Text("Close", color = Color(0xFF94A3B8))
+                Text("Close", color = Color(0xFF64748B))
             }
         }
     )
 }
 
 // -------------------------------------------------------------------------
-// SCREEN 3: ROLE DASHBOARD SCREEN WITH PICKUP ADDRESS & BAG PHOTO CAPTURE
+// SCREEN 3: ROLE DASHBOARD SCREEN (FULL EXCLUSIVE FUNCTIONALITIES)
 // -------------------------------------------------------------------------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -947,9 +813,6 @@ fun RoleDashboardScreen(
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var activeModalType by remember { mutableStateOf<String?>(null) }
     var showCameraModal by remember { mutableStateOf(false) }
-
-    // Compulsory pickup address state
-    var householdPickupAddress by remember { mutableStateOf("Flat B-502, Green Park Colony, Ward 42") }
 
     val scrollState = rememberScrollState()
 
@@ -971,12 +834,12 @@ fun RoleDashboardScreen(
                                 text = role.label,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = Color(0xFF0F172A)
                             )
                             Text(
                                 text = userEmail,
                                 fontSize = 10.sp,
-                                color = Color(0xFF10B981),
+                                color = Color(0xFF0D5C3A),
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -984,10 +847,10 @@ fun RoleDashboardScreen(
                 },
                 actions = {
                     IconButton(onClick = onSignOut) {
-                        Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out", tint = Color(0xFFEF4444))
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out", tint = Color(0xFFDC2626))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F172A))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         }
     ) { padding ->
@@ -999,7 +862,7 @@ fun RoleDashboardScreen(
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Active Scope Header
+            // Role Scope Header
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF0D5C3A)),
@@ -1020,69 +883,51 @@ fun RoleDashboardScreen(
                 }
             }
 
-            // Action Message Feedback
+            // Action Feedback Alert
             actionMessage?.let { msg ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0x3310B981)),
-                    border = CardDefaults.outlinedCardBorder().copy(brush = Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF00E5FF))))
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFDCFCE7))
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981))
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF166534))
                         Text(
                             text = msg,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = Color(0xFF166534),
                             modifier = Modifier.weight(1f)
                         )
                     }
                 }
             }
 
-            // ROLE PORTALS
+            // ROLE PORTAL ACTIONS
             when (role) {
                 UserRoleType.HOUSEHOLD -> {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0x1F1E293B)),
-                        border = CardDefaults.outlinedCardBorder().copy(brush = Brush.horizontalGradient(listOf(Color(0x4410B981), Color(0x4400E5FF)))),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Household Sanitary Pouch Portal", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                            Text("Household Sanitary Pouch Portal", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF0F172A))
                             
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x3310B981))
+                                    .background(Color(0xFFF0FDF4))
                                     .padding(12.dp)
                             ) {
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                     Column {
-                                        Text("Circular Credit Wallet Balance", fontSize = 11.sp, color = Color(0xFF10B981))
-                                        Text("${walletBalance.toInt()} Eco-Points (₹${walletBalance.toInt()}.00)", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                                        Text("Circular Credit Wallet Balance", fontSize = 11.sp, color = Color(0xFF166534))
+                                        Text("${walletBalance.toInt()} Eco-Points (₹${walletBalance.toInt()}.00)", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF0D5C3A))
                                     }
                                     Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFEAB308), modifier = Modifier.size(28.dp))
                                 }
                             }
-
-                            // COMPULSORY PICKUP ADDRESS INPUT FIELD
-                            OutlinedTextField(
-                                value = householdPickupAddress,
-                                onValueChange = { householdPickupAddress = it },
-                                label = { Text("Compulsory Doorstep Pickup Address") },
-                                leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFF10B981)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                            )
 
                             Button(
                                 onClick = { showCameraModal = true },
@@ -1098,21 +943,6 @@ fun RoleDashboardScreen(
 
                             Button(
                                 onClick = {
-                                    if (householdPickupAddress.isBlank()) {
-                                        Toast.makeText(context, "Please enter your Doorstep Pickup Address.", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        actionMessage = "Doorstep pickup booked for address: '$householdPickupAddress' tomorrow at 8:00 AM."
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0369A1)),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text("Book Doorstep Special-Care Pickup")
-                            }
-
-                            Button(
-                                onClick = {
                                     actionMessage = "Dispensed 10 Tamper-Evident QR Pouches (Serials NT-SAN-2026-8011 to 8020)."
                                 },
                                 modifier = Modifier.fillMaxWidth(),
@@ -1122,11 +952,22 @@ fun RoleDashboardScreen(
                                 Text("Request New Sanitary Pouch Batch (10 Pouches)")
                             }
 
+                            Button(
+                                onClick = {
+                                    actionMessage = "Doorstep collection booked for Ward 42 (Green Park Colony) tomorrow at 8:00 AM."
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0369A1)),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Book Doorstep Special-Care Pickup")
+                            }
+
                             OutlinedButton(
                                 onClick = {
                                     if (walletBalance >= 50) {
                                         walletBalance -= 50
-                                        actionMessage = "Redeemed ₹50 Electricity Bill Voucher! Code: DISC-ELEC-89302"
+                                        actionMessage = "Redeemed ₹50 Electricity Bill Voucher! Voucher Code: DISC-ELEC-89302"
                                     } else {
                                         Toast.makeText(context, "Insufficient points (Need 50 Pts)", Toast.LENGTH_SHORT).show()
                                     }
@@ -1134,59 +975,42 @@ fun RoleDashboardScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Redeem Reward Voucher (50 Pts)", color = Color.White)
+                                Text("Redeem Reward Voucher (50 Pts)")
                             }
                         }
                     }
                 }
 
                 UserRoleType.COLLECTOR -> {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0x1F1E293B)),
-                        border = CardDefaults.outlinedCardBorder().copy(brush = Brush.horizontalGradient(listOf(Color(0x4410B981), Color(0x4400E5FF)))),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Field Collector Scanner & Wallet Hub", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                            Text("Field Collector Scanner & Wallet Hub", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF0F172A))
 
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0x33FEF3C7))
+                                    .background(Color(0xFFFEF3C7))
                                     .padding(12.dp)
                             ) {
                                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                     Column {
-                                        Text("Collector Handling Incentive Wallet", fontSize = 11.sp, color = Color(0xFFF59E0B))
-                                        Text("₹${String.format("%.2f", walletBalance)} (₹2.00 per verified pouch)", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                                        Text("Collector Handling Incentive Wallet", fontSize = 11.sp, color = Color(0xFF92400E))
+                                        Text("₹${String.format("%.2f", walletBalance)} (₹2.00 per verified pouch)", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFB45309))
                                     }
-                                    Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(28.dp))
+                                    Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color(0xFFB45309), modifier = Modifier.size(28.dp))
                                 }
                             }
 
-                            // COLLECTOR CAMERA BAG IMAGE CAPTURE BUTTON
                             Button(
                                 onClick = { showCameraModal = true },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C3A)),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Icon(Icons.Default.Done, contentDescription = null, tint = Color.White)
-                                    Text("Capture Bag Photo & Run AI Vision Scanner", fontWeight = FontWeight.Bold)
-                                }
-                            }
-
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0x330F172A)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text("ASSIGNED PICKUP ROUTE (WARD 42):", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00E5FF))
-                                    Text("• Flat B-502, Green Park Colony (Scheduled 8:00 AM)", fontSize = 11.sp, color = Color.White)
-                                    Text("• House 14, Sector 3, Ward 42 (Scheduled 9:30 AM)", fontSize = 11.sp, color = Color.White)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
+                                    Text("Open Camera QR Pouch Scanner", fontWeight = FontWeight.Bold)
                                 }
                             }
 
@@ -1211,16 +1035,16 @@ fun RoleDashboardScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Request Instant UPI Wallet Payout", color = Color.White)
+                                Text("Request Instant UPI Wallet Payout")
                             }
                         }
                     }
                 }
 
                 UserRoleType.TAG_OFFICER -> {
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0x1F1E293B)), shape = RoundedCornerShape(16.dp)) {
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Tag Officer Inventory Serialization Hub", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                            Text("Tag Officer Inventory Serialization Hub", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF0F172A))
 
                             Button(
                                 onClick = {
@@ -1251,17 +1075,17 @@ fun RoleDashboardScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Lookup Tag Invariant State (NT-SAN-2026-8004)", color = Color.White)
+                                Text("Lookup Tag Invariant State (NT-SAN-2026-8004)")
                             }
                         }
                     }
                 }
 
                 UserRoleType.RWA_ADMIN -> {
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0x1F1E293B)), shape = RoundedCornerShape(16.dp)) {
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("RWA Colony Compliance Command", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                            Text("Green Park RWA • 450 Households • 96.8% Segregation Rate", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                            Text("RWA Colony Compliance Command", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF0F172A))
+                            Text("Green Park RWA • 450 Households • 96.8% Segregation Rate", fontSize = 12.sp, color = Color(0xFF475569))
 
                             Button(
                                 onClick = {
@@ -1292,17 +1116,17 @@ fun RoleDashboardScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Submit Incident Report to MCD Command", color = Color.White)
+                                Text("Submit Incident Report to MCD Command")
                             }
                         }
                     }
                 }
 
                 UserRoleType.BWG_ADMIN -> {
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0x1F1E293B)), shape = RoundedCornerShape(16.dp)) {
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Commercial Bulk Waste Generator Hub", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                            Text("Establishment: Hotel Grand Plaza • Daily Volume: 120 kg • Grade A Compliance", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                            Text("Commercial Bulk Waste Generator Hub", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF0F172A))
+                            Text("Establishment: Hotel Grand Plaza • Daily Volume: 120 kg • Grade A Compliance", fontSize = 12.sp, color = Color(0xFF475569))
 
                             Button(
                                 onClick = {
@@ -1336,17 +1160,17 @@ fun RoleDashboardScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Export Monthly Bulk Audit Log", color = Color.White)
+                                Text("Export Monthly Bulk Audit Log")
                             }
                         }
                     }
                 }
 
                 UserRoleType.MCD_OFFICER -> {
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0x1F1E293B)), shape = RoundedCornerShape(16.dp)) {
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("MCD Executive Telemetry Command", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                            Text("MCD Ward 42 • 5,800 Verified Pickups • 96% Compliance Index", fontSize = 12.sp, color = Color(0xFF94A3B8))
+                            Text("MCD Executive Telemetry Command", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF0F172A))
+                            Text("MCD Ward 42 • 5,800 Verified Pickups • 96% Compliance Index", fontSize = 12.sp, color = Color(0xFF475569))
 
                             Button(
                                 onClick = {
@@ -1377,16 +1201,16 @@ fun RoleDashboardScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Broadcast Ward Advisory Notice", color = Color.White)
+                                Text("Broadcast Ward Advisory Notice")
                             }
                         }
                     }
                 }
 
                 UserRoleType.SYSTEM_ADMIN -> {
-                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0x1F1E293B)), shape = RoundedCornerShape(16.dp)) {
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("System Security & RBAC Policy Engine", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                            Text("System Security & RBAC Policy Engine", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF0F172A))
 
                             Button(
                                 onClick = {
@@ -1417,7 +1241,7 @@ fun RoleDashboardScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Run Security & Compliance Audit", color = Color.White)
+                                Text("Run Security & Compliance Audit")
                             }
                         }
                     }
@@ -1426,28 +1250,30 @@ fun RoleDashboardScreen(
         }
     }
 
+    // Camera Scanner Dialog
     if (showCameraModal) {
         LiveCameraScannerModal(
-            onQrScanned = { tagCode, aiResult, bagCaptured ->
+            onQrScanned = { tagCode, aiResult ->
                 showCameraModal = false
                 if (role == UserRoleType.COLLECTOR) {
                     walletBalance += 2.0
-                    actionMessage = "Bag Photo Captured! Tag $tagCode • $aiResult • Status: CLOSED (+₹2.00 credited)"
+                    actionMessage = "Scanned Tag $tagCode • $aiResult • Tag Status set to CLOSED (+₹2.00)"
                 } else {
                     walletBalance += 10
-                    actionMessage = "Tag $tagCode • $aiResult • +10 Eco-Points added to Household Wallet!"
+                    actionMessage = "Scanned Tag $tagCode • $aiResult • +10 Eco-Points added to Household Wallet!"
                 }
             },
             onClose = { showCameraModal = false }
         )
     }
 
+    // MCD Compliance Certificate Dialog
     if (activeModalType == "BWG_CERTIFICATE") {
         AlertDialog(
             onDismissRequest = { activeModalType = null },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981))
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF0D5C3A))
                     Text("MCD Compliance Certificate", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             },
