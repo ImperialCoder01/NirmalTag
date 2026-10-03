@@ -204,8 +204,8 @@ export default function BWGPage() {
 
       {/* MODAL 1: LOG WASTE VOLUME */}
       {isLogVolumeOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
+        <div onClick={() => setIsLogVolumeOpen(false)} className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
             <button onClick={() => setIsLogVolumeOpen(false)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">
               <X className="w-5 h-5" />
             </button>
@@ -246,8 +246,8 @@ export default function BWGPage() {
 
       {/* MODAL 2: REQUEST BULK TAGS */}
       {isRequestTagsOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
+        <div onClick={() => setIsRequestTagsOpen(false)} className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
             <button onClick={() => setIsRequestTagsOpen(false)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">
               <X className="w-5 h-5" />
             </button>

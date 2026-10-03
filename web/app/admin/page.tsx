@@ -324,8 +324,8 @@ export default function SystemAdminPage() {
 
       {/* MODAL 1: PROVISION USER */}
       {isProvisionUserOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
+        <div onClick={() => setIsProvisionUserOpen(false)} className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
             <button onClick={() => setIsProvisionUserOpen(false)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">
               <X className="w-5 h-5" />
             </button>
@@ -394,8 +394,8 @@ export default function SystemAdminPage() {
 
       {/* MODAL 2: POLICY MULTIPLIERS */}
       {isPolicyModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
+        <div onClick={() => setIsPolicyModalOpen(false)} className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
             <button onClick={() => setIsPolicyModalOpen(false)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">
               <X className="w-5 h-5" />
             </button>

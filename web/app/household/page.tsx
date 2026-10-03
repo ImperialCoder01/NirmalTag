@@ -276,8 +276,8 @@ export default function HouseholdPage() {
 
       {/* MODAL 1: REGISTER TAG */}
       {isRegisterTagOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
+        <div onClick={() => setIsRegisterTagOpen(false)} className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
             <button
               onClick={() => setIsRegisterTagOpen(false)}
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
@@ -337,8 +337,8 @@ export default function HouseholdPage() {
 
       {/* MODAL 2: BOOK PICKUP */}
       {isBookPickupOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
+        <div onClick={() => setIsBookPickupOpen(false)} className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl relative">
             <button
               onClick={() => setIsBookPickupOpen(false)}
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
@@ -409,8 +409,8 @@ export default function HouseholdPage() {
 
       {/* MODAL 3: REDEEM REWARDS CATALOG */}
       {isRedeemOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative">
+        <div onClick={() => setIsRedeemOpen(false)} className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative">
             <button
               onClick={() => setIsRedeemOpen(false)}
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"

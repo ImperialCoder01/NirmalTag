@@ -321,8 +321,8 @@ export default function CollectorPage() {
 
       {/* Direct Payout Modal */}
       {isPayoutModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-5 shadow-2xl relative">
+        <div onClick={() => setIsPayoutModalOpen(false)} className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-5 shadow-2xl relative">
             <div className="space-y-1">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Wallet className="w-5 h-5 text-emerald-600" />

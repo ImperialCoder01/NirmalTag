@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth, UserRole, getRedirectPath } from "@/lib/auth-context";
 import { ShieldCheck, User, UserPlus, ChevronDown, LogOut, LayoutDashboard } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function Navbar() {
@@ -12,6 +12,20 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const router = useRouter();
+
+  const navRef = useRef<HTMLDivElement>(null);
+
+  // Auto-close dropdowns when user clicks outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+        setRoleMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const roles: { role: UserRole; label: string; path: string }[] = [
     { role: "HOUSEHOLD", label: "Household Resident", path: "/household" },
@@ -26,6 +40,7 @@ export default function Navbar() {
   const handleSignOut = async () => {
     await signOut();
     setUserMenuOpen(false);
+    setRoleMenuOpen(false);
     router.push("/login");
   };
 
@@ -36,9 +51,10 @@ export default function Navbar() {
   };
 
   const currentRoleLabel = roles.find((r) => r.role === role)?.label || role;
+  const isSystemAdmin = role === "SYSTEM_ADMIN";
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <header ref={navRef} className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand Logo & Title */}
         <Link href="/" className="flex items-center gap-3 group">
@@ -66,54 +82,62 @@ export default function Navbar() {
           {/* LOGGED IN NAVIGATION */}
           {user ? (
             <div className="flex items-center gap-3">
-              {/* Role Scope Selector (Admin or Role Switching) */}
-              <div className="relative">
-                <button
-                  onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                  aria-label="Role Selector"
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors"
-                >
+              {/* Static Role Badge (No dropdown for regular logged in users) */}
+              {!isSystemAdmin ? (
+                <div className="hidden sm:flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200 shadow-2xs">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <span>Role: <strong className="text-emerald-950 font-bold">{currentRoleLabel}</strong></span>
-                  <ChevronDown className="w-3 h-3 text-emerald-600" />
-                </button>
+                  <span>Role: <strong>{currentRoleLabel}</strong></span>
+                </div>
+              ) : (
+                /* Admin-Only Portal Switcher */
+                <div className="relative">
+                  <button
+                    onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+                    aria-label="Admin Role Switcher"
+                    className="flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-full bg-purple-50 text-purple-900 border border-purple-200 hover:bg-purple-100 transition-colors shadow-2xs"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-purple-600" />
+                    <span>Admin Scope: <strong>{currentRoleLabel}</strong></span>
+                    <ChevronDown className="w-3 h-3 text-purple-600" />
+                  </button>
 
-                {roleMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 text-xs font-medium">
-                    <div className="px-4 py-2 text-slate-400 font-bold border-b border-slate-100 uppercase tracking-wider text-[10px]">
-                      Switch Portal Role
+                  {roleMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 text-xs font-medium">
+                      <div className="px-4 py-2 text-slate-400 font-bold border-b border-slate-100 uppercase tracking-wider text-[10px]">
+                        System Admin Scope Switcher
+                      </div>
+                      {roles.map((r) => (
+                        <button
+                          key={r.role}
+                          onClick={() => handleRoleSelect(r.role)}
+                          className={`w-full text-left px-4 py-2 hover:bg-purple-50 transition-colors flex items-center justify-between ${
+                            role === r.role ? "bg-purple-100 font-bold text-purple-950" : "text-slate-700"
+                          }`}
+                        >
+                          <span>{r.label}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{r.path}</span>
+                        </button>
+                      ))}
                     </div>
-                    {roles.map((r) => (
-                      <button
-                        key={r.role}
-                        onClick={() => handleRoleSelect(r.role)}
-                        className={`w-full text-left px-4 py-2 hover:bg-emerald-50 transition-colors flex items-center justify-between ${
-                          role === r.role ? "bg-emerald-100 font-bold text-emerald-950" : "text-slate-700"
-                        }`}
-                      >
-                        <span>{r.label}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">{r.path}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {/* Direct Link to My Active Portal */}
               <Link
                 href={getRedirectPath(role)}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-900 bg-emerald-100 hover:bg-emerald-200 rounded-xl transition-colors border border-emerald-300"
+                className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-extrabold text-emerald-900 bg-emerald-100 hover:bg-emerald-200 rounded-xl transition-colors border border-emerald-300 shadow-sm"
               >
                 <LayoutDashboard className="w-3.5 h-3.5 text-emerald-700" />
                 <span>My Portal</span>
               </Link>
 
-              {/* User Account Menu / Badge */}
+              {/* User Account Menu / Badge with Click-Outside Closing */}
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   aria-label="User Account Menu"
-                  className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-sm"
+                  className="flex items-center gap-2 text-xs font-bold px-3.5 py-1.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-sm"
                 >
                   <div className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-[10px] font-extrabold uppercase">
                     {(user.displayName || user.email || "U")[0]}
@@ -127,8 +151,8 @@ export default function Navbar() {
                     <div className="px-4 pb-2 border-b border-slate-100">
                       <div className="font-bold text-slate-900">{user.displayName || "NirmalTag User"}</div>
                       <div className="text-[11px] text-slate-500 truncate">{user.email}</div>
-                      <div className="mt-1 inline-block px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
-                        {role.replace("_", " ")}
+                      <div className="mt-1 inline-block px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
+                        {currentRoleLabel}
                       </div>
                     </div>
 
