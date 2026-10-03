@@ -8,7 +8,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function Navbar() {
-  const { user, role, setRole, signOut } = useAuth();
+  const { user, role, assignedRoles, setRole, signOut } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const router = useRouter();
@@ -37,17 +37,24 @@ export default function Navbar() {
     { role: "SYSTEM_ADMIN", label: "System Admin", path: "/admin" },
   ];
 
+  // Filter scope switcher: Display only roles authorized for this account by server DB
+  const authorizedRoleOptions = roles.filter(
+    (r) => assignedRoles.includes(r.role) || assignedRoles.includes("SYSTEM_ADMIN")
+  );
+
+  const handleRoleSelect = async (newRole: UserRole) => {
+    const authorized = await setRole(newRole);
+    setRoleMenuOpen(false);
+    if (authorized) {
+      router.push(getRedirectPath(newRole));
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     setUserMenuOpen(false);
     setRoleMenuOpen(false);
     router.push("/login");
-  };
-
-  const handleRoleSelect = (newRole: UserRole) => {
-    setRole(newRole);
-    setRoleMenuOpen(false);
-    router.push(getRedirectPath(newRole));
   };
 
   const currentRoleLabel = roles.find((r) => r.role === role)?.label || role;
@@ -106,7 +113,7 @@ export default function Navbar() {
                       <div className="px-4 py-2 text-slate-400 font-bold border-b border-slate-100 uppercase tracking-wider text-[10px]">
                         System Admin Scope Switcher
                       </div>
-                      {roles.map((r) => (
+                      {authorizedRoleOptions.map((r) => (
                         <button
                           key={r.role}
                           onClick={() => handleRoleSelect(r.role)}
@@ -115,7 +122,6 @@ export default function Navbar() {
                           }`}
                         >
                           <span>{r.label}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">{r.path}</span>
                         </button>
                       ))}
                     </div>

@@ -14,21 +14,36 @@ export type UserRole =
   | "MCD_OFFICER" 
   | "SYSTEM_ADMIN";
 
+export interface UserScope {
+  level: string;
+  wardId?: string;
+  rwaId?: string;
+  bwgId?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   role: UserRole;
+  assignedRoles: UserRole[];
+  scope: UserScope;
   loading: boolean;
-  setRole: (role: UserRole) => void;
+  setRole: (role: UserRole) => Promise<boolean>;
   signOut: () => Promise<void>;
+  getIdToken: () => Promise<string | null>;
   getRedirectPath: (role: UserRole) => string;
 }
+
+const defaultScope: UserScope = { level: "WARD", wardId: "ward-42" };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   role: "HOUSEHOLD",
+  assignedRoles: ["HOUSEHOLD"],
+  scope: defaultScope,
   loading: true,
-  setRole: () => {},
+  setRole: async () => false,
   signOut: async () => {},
+  getIdToken: async () => null,
   getRedirectPath: () => "/household",
 });
 
@@ -49,38 +64,60 @@ export const getRedirectPath = (role: UserRole): string => {
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRoleState] = useState<UserRole>("HOUSEHOLD");
+  const [assignedRoles, setAssignedRoles] = useState<UserRole[]>(["HOUSEHOLD"]);
+  const [scope, setScope] = useState<UserScope>(defaultScope);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Restore selected role from local storage if set
-    const savedRole = localStorage.getItem("nirmaltag_user_role") as UserRole;
-    if (savedRole) {
-      setRoleState(savedRole);
+  const getIdToken = async (): Promise<string | null> => {
+    if (!auth.currentUser) return null;
+    try {
+      return await auth.currentUser.getIdToken();
+    } catch {
+      return null;
     }
+  };
 
+  const resolveServerSession = async (currentUser: User, requestedRole?: UserRole) => {
+    try {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch("/api/v1/auth/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ requestedRole: requestedRole || role }),
+      });
+
+      if (res.ok) {
+        const sessionData = await res.json();
+        if (sessionData.assignedRoles && sessionData.assignedRoles.length > 0) {
+          setAssignedRoles(sessionData.assignedRoles as UserRole[]);
+        }
+        if (sessionData.activeRole) {
+          setRoleState(sessionData.activeRole as UserRole);
+        }
+        if (sessionData.scope) {
+          setScope(sessionData.scope);
+        }
+        return true;
+      }
+    } catch (err) {
+      console.error("Server session resolution failed:", err);
+    }
+    return false;
+  };
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
 
       if (currentUser) {
-        try {
-          const { data: existingProfile } = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("firebase_uid", currentUser.uid)
-            .single();
-
-          if (!existingProfile) {
-            await supabase.from("profiles").upsert({
-              id: currentUser.uid,
-              firebase_uid: currentUser.uid,
-              email: currentUser.email || "",
-              full_name: currentUser.displayName || currentUser.email?.split("@")[0] || "NirmalTag User",
-              is_active: true
-            });
-          }
-        } catch (err) {
-          console.error("Supabase profile sync:", err);
-        }
+        // Sync Profile & Fetch Authoritative Server Roles
+        await resolveServerSession(currentUser);
+      } else {
+        setRoleState("HOUSEHOLD");
+        setAssignedRoles(["HOUSEHOLD"]);
       }
 
       setLoading(false);
@@ -89,18 +126,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  const setRole = (newRole: UserRole) => {
-    setRoleState(newRole);
-    localStorage.setItem("nirmaltag_user_role", newRole);
+  const setRole = async (newRole: UserRole): Promise<boolean> => {
+    if (!user) {
+      setRoleState(newRole);
+      return true;
+    }
+
+    // Server-side verification: Check if newRole is assigned to account in database
+    if (assignedRoles.includes(newRole) || assignedRoles.includes("SYSTEM_ADMIN")) {
+      setRoleState(newRole);
+      await resolveServerSession(user, newRole);
+      return true;
+    } else {
+      console.warn(`Role ${newRole} rejected: Account is assigned [${assignedRoles.join(", ")}]`);
+      return false;
+    }
   };
 
   const handleSignOut = async () => {
     await firebaseSignOut(auth);
     setUser(null);
+    setRoleState("HOUSEHOLD");
+    setAssignedRoles(["HOUSEHOLD"]);
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, setRole, signOut: handleSignOut, getRedirectPath }}>
+    <AuthContext.Provider value={{
+      user,
+      role,
+      assignedRoles,
+      scope,
+      loading,
+      setRole,
+      signOut: handleSignOut,
+      getIdToken,
+      getRedirectPath
+    }}>
       {children}
     </AuthContext.Provider>
   );

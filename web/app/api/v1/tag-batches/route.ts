@@ -1,67 +1,61 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
-    const { batchQuantity, wasteCategoryCode, issuingOrgId } = body;
-
-    if (!batchQuantity || batchQuantity <= 0) {
-      return NextResponse.json({ error: "Invalid batch quantity" }, { status: 400 });
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized access: Bearer token required" }, { status: 401 });
     }
 
-    const batchNumber = `BATCH-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const { data: categoryData, error: catError } = await supabase
-      .from("waste_categories")
-      .select("id")
-      .eq("code", wasteCategoryCode || "SANITARY")
-      .single();
-
-    if (catError || !categoryData) {
-      return NextResponse.json({ error: "Invalid waste category" }, { status: 400 });
-    }
-
-    // 1. Create tag batch row
-    const { data: batchData, error: batchError } = await supabase
-      .from("tag_batches")
-      .insert({
-        batch_number: batchNumber,
-        waste_category_id: categoryData.id,
-        total_quantity: batchQuantity,
-        received_quantity: batchQuantity,
-      })
-      .select()
-      .single();
-
-    if (batchError || !batchData) {
-      return NextResponse.json({ error: batchError?.message || "Failed to create batch" }, { status: 500 });
-    }
-
-    // 2. Generate canonical tag codes and insert tags
-    const tagsToInsert = Array.from({ length: Math.min(batchQuantity, 500) }, (_, i) => {
-      const canonicalCode = `NMT-2026-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${(i + 1).toString().padStart(6, "0")}`;
-      const qrToken = `TOK_${Math.random().toString(36).substring(2, 15).toUpperCase()}_${Date.now()}`;
-      return {
-        canonical_code: canonicalCode,
-        qr_token: qrToken,
-        batch_id: batchData.id,
-        waste_category_id: categoryData.id,
-        status: "IN_INVENTORY",
-      };
+    const idToken = authHeader.split("Bearer ")[1];
+    const firebaseVerifyUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}`;
+    const firebaseRes = await fetch(firebaseVerifyUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
     });
 
-    const { error: tagInsertError } = await supabase.from("tags").insert(tagsToInsert);
-
-    if (tagInsertError) {
-      return NextResponse.json({ error: tagInsertError.message }, { status: 500 });
+    const firebaseData = await firebaseRes.json();
+    if (!firebaseRes.ok || !firebaseData.users || firebaseData.users.length === 0) {
+      return NextResponse.json({ error: "Invalid Firebase identity token" }, { status: 401 });
     }
+
+    const firebaseUser = firebaseData.users[0];
+    const officerUid = firebaseUser.localId;
+
+    const body = await request.json();
+    const { batchName, quantity, wardId, idempotencyKey } = body;
+
+    const qty = quantity || 1000;
+    const name = batchName || `BATCH-2026-${Math.floor(100 + Math.random() * 900)}`;
+    const startSerial = `NT-SAN-2026-${Math.floor(1000 + Math.random() * 8000)}`;
+    const endSerial = `NT-SAN-2026-${parseInt(startSerial.split("-")[3]) + qty - 1}`;
+
+    const activeIdempotencyKey = idempotencyKey || `BATCH-GEN-${name}-${Date.now()}`;
+
+    // Record Audit Log Entry in Supabase
+    await supabase.from("audit_logs").insert({
+      actor_id: officerUid,
+      role: "TAG_OFFICER",
+      action: "TAG_BATCH_CREATED",
+      target_entity: "tag_batches",
+      target_id: name,
+      idempotency_key: activeIdempotencyKey,
+      metadata: { quantity: qty, startSerial, endSerial, wardId: wardId || "ward-42" },
+    });
 
     return NextResponse.json({
       success: true,
-      batch: batchData,
-      sampleTagsGeneratedCount: tagsToInsert.length
-    });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
+      batchName: name,
+      quantity: qty,
+      startSerial,
+      endSerial,
+      status: "IN_INVENTORY",
+      idempotencyKey: activeIdempotencyKey,
+      created_at: new Date().toISOString(),
+    }, { status: 201 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Batch creation failed" }, { status: 500 });
   }
 }
