@@ -1,33 +1,49 @@
-# ITERATION 1.6 FINAL VERIFICATION REPORT
+# ITERATION 1.6B — LIVE SUPABASE + REAL RLS VERIFICATION REPORT
 
-**Date:** October 3, 2026  
+**Date:** October 4, 2026  
 **Repository:** https://github.com/ImperialCoder01/NirmalTag  
-**Scope:** Iteration 1.6 Backend Security Hardening, Cryptographic Auth Context & Impersonation Prevention
+**Scope:** Live Supabase Database Migration & RLS Behavioral Audit
 
 ---
 
-## Executive Summary
+## 1. Live Supabase Project Identification
 
-Iteration 1.6 addresses all security vulnerabilities identified in the audit:
-1. **Cryptographic Token Verification:** Updated `web/lib/supabase-auth.ts` to verify incoming identity tokens using Supabase Auth Service (`supabaseUserClient.auth.getUser()`).
-2. **Elimination of Service Role Abuse:** All user-facing API routes (`/api/v1/pickups/sync`, `/api/v1/tag-batches`, `/api/v1/tags/lifecycle`, `/api/v1/auth/session`) now execute database RPCs using `supabaseUserClient`, passing incoming Firebase ID Tokens directly for PostgreSQL RLS evaluation.
-3. **Impersonation Prevention:** Created migration `20261003000005_iteration1_6_security_hardening.sql`. Functions `process_verified_pickup_transaction_v2`, `transition_tag_state`, and `create_tag_batch_and_records` derive actor identity directly from `get_auth_jwt_sub()` (authenticated JWT context). Clients cannot submit arbitrary actor UUIDs or claim unassigned roles.
-4. **Fail-Closed Pickup Finalization:** Removed all legacy REST token lookup APIs, fake UUID defaults, hardcoded rewards, and `success: true` fallbacks.
+- **Project Ref:** `ubphrqumpqdifupwbvpe`
+- **Supabase URL:** `https://ubphrqumpqdifupwbvpe.supabase.co`
+- **Environment Configuration:** Confirmed in `web/.env.local`.
 
 ---
 
-## Detailed Audit Results
+## 2. Live Supabase Migration Status
 
-### 1. GitHub Remote Synchronization
-- Verified local HEAD matches `origin/main` commit `5427097bc4077513793c401054d6a8cd5122176b`.
-- All modifications committed and pushed cleanly to `https://github.com/ImperialCoder01/NirmalTag.git`.
+Direct empirical queries against the live Supabase Data API (`https://ubphrqumpqdifupwbvpe.supabase.co`) reveal:
 
-### 2. Zero Legacy Firebase REST Auth
-- `git grep` verification confirms 0 production occurrences of `accounts:lookup`, `identitytoolkit`, or `firebaseVerifyUrl`.
+- **Migration `20261003000004_iteration1_5_security_and_policies.sql`:** **NOT APPLIED**
+  - Table `public.reward_policies` returns `PGRST205` ("Could not find the table 'public.reward_policies' in the schema cache").
+  - Function `public.process_verified_pickup_transaction_v2` returns `PGRST202` ("Could not find the function public.process_verified_pickup_transaction_v2 in the schema cache").
+- **Migration `20261003000005_iteration1_6_security_hardening.sql`:** **NOT APPLIED**
+  - Functions `get_auth_jwt_sub()`, `transition_tag_state()`, `process_verified_pickup_transaction_v2()`, and `create_tag_batch_and_records()` do not exist on the live database server.
 
-### 3. PostgreSQL Security Hardening Migration
-- Created `supabase/migrations/20261003000005_iteration1_6_security_hardening.sql`.
-- Functions check `user_roles` database truth and raise `42501: Access Denied` on role or identity mismatch.
+---
+
+## 3. Live RLS Behavioral & Function Verification
+
+Since migrations `0004` and `0005` have not been executed on the live Supabase project instance:
+
+- **Live Database Functions:** **NOT VERIFIED / NOT APPLIED**
+- **Live Security Definer Guards:** **NOT VERIFIED / NOT APPLIED**
+- **Live RLS Behavioral Tests (Tests 1 through 12):** **NOT VERIFIED** (Live database schema lacks `reward_policies` and iteration 1.5/1.6 RPC procedures).
+- **Firebase → Supabase → auth.uid():** **PARTIAL** (Browser client configured, but database policies awaiting migration execution).
+
+---
+
+## 4. User Actions Required to Complete Live Verification
+
+To execute the migrations on your live Supabase project:
+1. Open the **Supabase Dashboard** for project `ubphrqumpqdifupwbvpe`.
+2. Navigate to **SQL Editor**.
+3. Copy and run the contents of [`supabase/migrations/20261003000004_iteration1_5_security_and_policies.sql`](file:///d:/LOQ/Documents/WasteChakra/supabase/migrations/20261003000004_iteration1_5_security_and_policies.sql).
+4. Copy and run the contents of [`supabase/migrations/20261003000005_iteration1_6_security_hardening.sql`](file:///d:/LOQ/Documents/WasteChakra/supabase/migrations/20261003000005_iteration1_6_security_hardening.sql).
 
 ---
 
@@ -37,16 +53,20 @@ Iteration 1.6 addresses all security vulnerabilities identified in the audit:
 GitHub main: PASS
 Firebase Third-Party Auth: PASS
 JWT verification: PASS
-Supabase RLS: PASS
-Role authorization: PASS
-Actor authorization: PASS
-Scope authorization: PASS
-Tag lifecycle: PASS
-Pickup transaction: PASS
-Reward policy: PASS
-Idempotency: PASS
-Live database: PARTIAL
-RLS behavioral tests: NOT VERIFIED
+Live migration 0004: NOT APPLIED
+Live migration 0005: NOT APPLIED
+Live database functions: NOT VERIFIED
+Live RLS policies: NOT VERIFIED
+Household isolation: NOT VERIFIED
+Collector scope: NOT VERIFIED
+MCD scope: NOT VERIFIED
+Actor impersonation protection: NOT VERIFIED
+Role impersonation protection: NOT VERIFIED
+Tag lifecycle: NOT VERIFIED
+Pickup transaction: NOT VERIFIED
+Reward policy: NOT VERIFIED
+Idempotency: NOT VERIFIED
+Firebase → Supabase → auth.uid(): PARTIAL
 Build: PASS
-Tests: PASS
+Unit tests: PASS
 ```
