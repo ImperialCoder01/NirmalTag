@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const collectorUid = firebaseUser.uid;
 
     const body = await request.json().catch(() => ({}));
-    const { pickupId, tagId, idempotencyKey } = body;
+    const { pickupId, tagId, householdId: clientSuppliedHouseholdId, idempotencyKey } = body;
 
     if (!pickupId || !tagId) {
       return NextResponse.json({
@@ -26,6 +26,31 @@ export async function POST(request: Request) {
         code: "INVALID_PARAMETERS",
         message: "Pickup processing failed: pickupId and tagId are required parameters.",
       }, { status: 400 });
+    }
+
+    // Phase 3 — Household Mismatch Protection: If client supplies householdId, verify it matches the derived tag ownership
+    if (clientSuppliedHouseholdId) {
+      const { data: tagData, error: tagErr } = await supabaseUserClient
+        .from("tags")
+        .select("current_assigned_household_id")
+        .eq("id", tagId)
+        .single();
+
+      if (tagErr || !tagData) {
+        return NextResponse.json({
+          success: false,
+          code: "TAG_NOT_FOUND",
+          message: "Specified tag does not exist.",
+        }, { status: 404 });
+      }
+
+      if (tagData.current_assigned_household_id !== clientSuppliedHouseholdId) {
+        return NextResponse.json({
+          success: false,
+          code: "HOUSEHOLD_MISMATCH",
+          message: "Client-supplied household_id does not match authoritative tag ownership.",
+        }, { status: 400 });
+      }
     }
 
     const activeIdempotencyKey = idempotencyKey || `SYNC-${pickupId}-${tagId}`;

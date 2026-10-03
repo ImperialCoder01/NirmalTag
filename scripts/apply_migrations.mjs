@@ -37,7 +37,7 @@ async function applyMigration(fileName) {
 
 async function run() {
   const targetFiles = [
-    '20261003000007_iteration6_household_rwa_ownership.sql'
+    '20261003000008_iteration7_pickup_transaction_hardening.sql'
   ];
 
   for (const file of targetFiles) {
