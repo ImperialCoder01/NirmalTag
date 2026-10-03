@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
-import { ShieldCheck, UserPlus, Mail, Lock, User, AlertCircle, Info } from "lucide-react";
+import { ShieldCheck, UserPlus, Mail, Lock, User, AlertCircle, Info, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
@@ -16,7 +16,7 @@ export default function RegisterPage() {
   const [selectedRole, setSelectedRole] = useState<"HOUSEHOLD" | "COLLECTOR">("HOUSEHOLD");
   const [hasAgreedConsent, setHasAgreedConsent] = useState(true);
   const [error, setError] = useState("");
-  const [infoMessage, setInfoMessage] = useState("");
+  const [firebaseSetupError, setFirebaseSetupError] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -34,19 +34,18 @@ export default function RegisterPage() {
 
     setLoading(true);
     setError("");
-    setInfoMessage("");
+    setFirebaseSetupError(false);
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
         await updateProfile(userCredential.user, { displayName: fullName });
       }
-      setInfoMessage("Account successfully created! Redirecting to portal...");
-      setTimeout(() => router.push(selectedRole === "COLLECTOR" ? "/collector" : "/household"), 1200);
+      router.push(selectedRole === "COLLECTOR" ? "/collector" : "/household");
     } catch (err: any) {
-      if (err.code === "auth/configuration-not-found" || err.message?.includes("configuration-not-found")) {
-        setInfoMessage("Firebase Auth is activating. Demo account session initialized.");
-        setTimeout(() => router.push(selectedRole === "COLLECTOR" ? "/collector" : "/household"), 1200);
+      if (err.code === "auth/configuration-not-found" || err.message?.includes("configuration-not-found") || err.code === "auth/unauthorized-domain") {
+        setFirebaseSetupError(true);
+        setError(err.message || "Firebase Authentication provider needs setup in Firebase Console.");
       } else {
         setError(err.message || "Failed to create account.");
       }
@@ -63,16 +62,15 @@ export default function RegisterPage() {
 
     setLoading(true);
     setError("");
-    setInfoMessage("");
+    setFirebaseSetupError(false);
 
     try {
       await signInWithPopup(auth, googleProvider);
-      setInfoMessage("Google sign-in successful! Redirecting to portal...");
-      setTimeout(() => router.push(selectedRole === "COLLECTOR" ? "/collector" : "/household"), 1200);
+      router.push(selectedRole === "COLLECTOR" ? "/collector" : "/household");
     } catch (err: any) {
-      if (err.code === "auth/configuration-not-found" || err.message?.includes("configuration-not-found")) {
-        setInfoMessage("Firebase Auth is activating. Demo Google identity session initialized.");
-        setTimeout(() => router.push(selectedRole === "COLLECTOR" ? "/collector" : "/household"), 1200);
+      if (err.code === "auth/configuration-not-found" || err.message?.includes("configuration-not-found") || err.code === "auth/unauthorized-domain") {
+        setFirebaseSetupError(true);
+        setError(err.message || "Firebase Authentication provider needs setup in Firebase Console.");
       } else {
         setError(err.message || "Failed to sign up with Google.");
       }
@@ -95,16 +93,21 @@ export default function RegisterPage() {
         </div>
 
         {error && (
-          <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {infoMessage && (
-          <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-medium flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-            <span>{infoMessage}</span>
+          <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+            {firebaseSetupError && (
+              <div className="pt-2 border-t border-red-200/60 text-[11px] text-red-800 space-y-1 font-normal">
+                <strong>How to enable Google Auth in your Firebase Console:</strong>
+                <ol className="list-decimal pl-4 space-y-1">
+                  <li>Go to <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="underline font-bold">Firebase Console</a> → Project <strong>nirmaltag</strong>.</li>
+                  <li>Click <strong>Authentication</strong> → <strong>Sign-in method</strong> → Enable <strong>Google</strong> and <strong>Email/Password</strong>.</li>
+                  <li>In <strong>Settings</strong> → <strong>Authorized domains</strong>, add <code className="bg-red-100 px-1 py-0.5 rounded font-mono font-bold">nirmaltag.vercel.app</code>.</li>
+                </ol>
+              </div>
+            )}
           </div>
         )}
 
@@ -121,7 +124,7 @@ export default function RegisterPage() {
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
           </svg>
-          <span>Sign Up with Google</span>
+          <span>{loading ? "Signing up..." : "Sign Up with Google"}</span>
         </button>
 
         <div className="relative my-4">

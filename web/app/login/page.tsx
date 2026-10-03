@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
-import { ShieldCheck, LogIn, Mail, Lock, UserPlus, AlertCircle, CheckSquare, Square } from "lucide-react";
+import { ShieldCheck, LogIn, Mail, Lock, UserPlus, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [hasAgreedConsent, setHasAgreedConsent] = useState(true);
   const [error, setError] = useState("");
-  const [infoMessage, setInfoMessage] = useState("");
+  const [firebaseSetupError, setFirebaseSetupError] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -26,15 +26,15 @@ export default function LoginPage() {
 
     setLoading(true);
     setError("");
-    setInfoMessage("");
+    setFirebaseSetupError(false);
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push("/household");
     } catch (err: any) {
-      if (err.code === "auth/configuration-not-found" || err.message?.includes("configuration-not-found")) {
-        setInfoMessage("Firebase Auth is activating in console. Demo identity session initialized.");
-        setTimeout(() => router.push("/household"), 1200);
+      if (err.code === "auth/configuration-not-found" || err.message?.includes("configuration-not-found") || err.code === "auth/unauthorized-domain") {
+        setFirebaseSetupError(true);
+        setError(err.message || "Firebase Authentication provider needs setup in Firebase Console.");
       } else {
         setError(err.message || "Failed to sign in. Please check credentials.");
       }
@@ -51,15 +51,15 @@ export default function LoginPage() {
 
     setLoading(true);
     setError("");
-    setInfoMessage("");
+    setFirebaseSetupError(false);
 
     try {
       await signInWithPopup(auth, googleProvider);
       router.push("/household");
     } catch (err: any) {
-      if (err.code === "auth/configuration-not-found" || err.message?.includes("configuration-not-found")) {
-        setInfoMessage("Firebase Auth is activating in console. Demo identity session initialized.");
-        setTimeout(() => router.push("/household"), 1200);
+      if (err.code === "auth/configuration-not-found" || err.message?.includes("configuration-not-found") || err.code === "auth/unauthorized-domain") {
+        setFirebaseSetupError(true);
+        setError(err.message || "Firebase Authentication provider needs setup in Firebase Console.");
       } else {
         setError(err.message || "Failed to sign in with Google.");
       }
@@ -82,16 +82,21 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {infoMessage && (
-          <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-medium flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-            <span>{infoMessage}</span>
+          <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+            {firebaseSetupError && (
+              <div className="pt-2 border-t border-red-200/60 text-[11px] text-red-800 space-y-1 font-normal">
+                <strong>How to enable Google Auth in your Firebase Console:</strong>
+                <ol className="list-decimal pl-4 space-y-1">
+                  <li>Go to <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="underline font-bold">Firebase Console</a> → Project <strong>nirmaltag</strong>.</li>
+                  <li>Click <strong>Authentication</strong> → <strong>Sign-in method</strong> → Enable <strong>Google</strong> and <strong>Email/Password</strong>.</li>
+                  <li>In <strong>Settings</strong> → <strong>Authorized domains</strong>, add <code className="bg-red-100 px-1 py-0.5 rounded font-mono font-bold">nirmaltag.vercel.app</code>.</li>
+                </ol>
+              </div>
+            )}
           </div>
         )}
 
@@ -130,7 +135,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Explicit Data Consent Checkbox & Documentation Link */}
+          {/* Explicit Data Consent Checkbox */}
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-[11px]">
             <label className="flex items-start gap-2.5 cursor-pointer text-slate-700 font-medium">
               <input
@@ -174,7 +179,7 @@ export default function LoginPage() {
           onClick={handleGoogleLogin}
           disabled={loading}
           aria-label="Sign In with Google"
-          className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs border border-slate-300 rounded-xl transition-colors flex items-center justify-center gap-2"
+          className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs border border-slate-300 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -185,7 +190,6 @@ export default function LoginPage() {
           <span>Sign In with Google</span>
         </button>
 
-        {/* Create Account Link Section */}
         <div className="pt-4 border-t border-slate-100 text-center space-y-2">
           <p className="text-xs text-slate-600 font-medium">Don't have an account yet?</p>
           <Link
