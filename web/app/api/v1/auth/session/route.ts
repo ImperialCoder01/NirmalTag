@@ -1,38 +1,23 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { authenticateServerRequest } from "@/lib/supabase-auth";
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Missing or invalid Authorization header" }, { status: 401 });
+    let authResult;
+    try {
+      authResult = await authenticateServerRequest(request);
+    } catch (authErr: any) {
+      return NextResponse.json({ error: authErr.message || "Unauthorized" }, { status: 401 });
     }
 
-    const idToken = authHeader.split("Bearer ")[1];
-    if (!idToken) {
-      return NextResponse.json({ error: "Empty authorization token" }, { status: 401 });
-    }
+    const { user: firebaseUser } = authResult;
+    const firebaseUid = firebaseUser.uid;
+    const email = firebaseUser.email;
+    const fullName = firebaseUser.fullName;
 
     const body = await request.json().catch(() => ({}));
     const requestedRole = body.requestedRole;
-
-    // Verify token with Firebase Auth REST lookup API
-    const firebaseVerifyUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}`;
-    const firebaseRes = await fetch(firebaseVerifyUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken }),
-    });
-
-    const firebaseData = await firebaseRes.json();
-    if (!firebaseRes.ok || !firebaseData.users || firebaseData.users.length === 0) {
-      return NextResponse.json({ error: "Invalid or expired Firebase identity token" }, { status: 401 });
-    }
-
-    const firebaseUser = firebaseData.users[0];
-    const firebaseUid = firebaseUser.localId;
-    const email = firebaseUser.email || "";
-    const fullName = firebaseUser.displayName || email.split("@")[0] || "NirmalTag User";
 
     // 1. Fetch profile from Supabase
     let { data: profile } = await supabaseAdmin
@@ -99,7 +84,7 @@ export async function POST(request: Request) {
       }, { status: 403 });
     }
 
-    // 3. Resolve Database Scope Boundaries (NO hardcoded ward-42 defaults!)
+    // 3. Resolve Database Scope Boundaries
     let scope: any = { level: activeRole === "SYSTEM_ADMIN" ? "SYSTEM" : "UNBOUND" };
 
     if (activeRole === "HOUSEHOLD") {

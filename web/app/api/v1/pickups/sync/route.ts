@@ -1,38 +1,24 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { authenticateServerRequest } from "@/lib/supabase-auth";
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    let authResult;
+    try {
+      authResult = await authenticateServerRequest(request);
+    } catch (authErr: any) {
       return NextResponse.json({
         success: false,
         code: "UNAUTHORIZED",
-        message: "Pickup processing failed: Missing or invalid Authorization header.",
+        message: authErr.message || "Missing or invalid identity token.",
       }, { status: 401 });
     }
 
-    const idToken = authHeader.split("Bearer ")[1];
-    const firebaseVerifyUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}`;
-    const firebaseRes = await fetch(firebaseVerifyUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken }),
-    });
+    const { user: firebaseUser } = authResult;
+    const collectorUid = firebaseUser.uid;
 
-    const firebaseData = await firebaseRes.json();
-    if (!firebaseRes.ok || !firebaseData.users || firebaseData.users.length === 0) {
-      return NextResponse.json({
-        success: false,
-        code: "INVALID_TOKEN",
-        message: "Pickup processing failed: Invalid or expired Firebase identity token.",
-      }, { status: 401 });
-    }
-
-    const firebaseUser = firebaseData.users[0];
-    const collectorUid = firebaseUser.localId;
-
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { pickupId, tagId, idempotencyKey } = body;
 
     if (!pickupId || !tagId) {

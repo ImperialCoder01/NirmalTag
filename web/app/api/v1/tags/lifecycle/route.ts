@@ -1,69 +1,82 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { authenticateServerRequest } from "@/lib/supabase-auth";
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized access: Bearer token required" }, { status: 401 });
+    let authResult;
+    try {
+      authResult = await authenticateServerRequest(request);
+    } catch (authErr: any) {
+      return NextResponse.json({
+        success: false,
+        code: "UNAUTHORIZED",
+        message: authErr.message || "Missing or invalid identity token.",
+      }, { status: 401 });
     }
 
-    const idToken = authHeader.split("Bearer ")[1];
-    const firebaseVerifyUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}`;
-    const firebaseRes = await fetch(firebaseVerifyUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken }),
-    });
+    const { user: firebaseUser } = authResult;
+    const actorUid = firebaseUser.uid;
 
-    const firebaseData = await firebaseRes.json();
-    if (!firebaseRes.ok || !firebaseData.users || firebaseData.users.length === 0) {
-      return NextResponse.json({ error: "Invalid Firebase identity token" }, { status: 401 });
-    }
-
-    const firebaseUser = firebaseData.users[0];
-    const actorUid = firebaseUser.localId;
-
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { tagId, newStatus, reason, idempotencyKey } = body;
 
     if (!tagId || !newStatus) {
-      return NextResponse.json({ error: "Tag ID and newStatus are required" }, { status: 400 });
+      return NextResponse.json({
+        success: false,
+        code: "INVALID_PARAMETERS",
+        message: "Tag ID and newStatus are required parameters.",
+      }, { status: 400 });
+    }
+
+    // Resolve actor's DB role
+    const { data: userRoleRecords } = await supabaseAdmin
+      .from("user_roles")
+      .select("roles(name)")
+      .eq("user_id", actorUid);
+
+    let actorRole = "AUTHENTICATED_USER";
+    if (userRoleRecords && userRoleRecords.length > 0) {
+      const firstRec = userRoleRecords[0] as any;
+      if (Array.isArray(firstRec.roles)) {
+        actorRole = firstRec.roles[0]?.name || actorRole;
+      } else if (firstRec.roles?.name) {
+        actorRole = firstRec.roles.name;
+      }
     }
 
     // Invoke PostgreSQL transition function: transition_tag_state
-    const { data: transitionResult, error: dbError } = await supabase.rpc(
+    const { data: transitionResult, error: dbError } = await supabaseAdmin.rpc(
       "transition_tag_state",
       {
         p_tag_id: tagId,
         p_new_status: newStatus,
         p_actor_profile_id: actorUid,
-        p_actor_role: "SYSTEM",
+        p_actor_role: actorRole,
         p_reason: reason || "API Lifecycle Request",
         p_idempotency_key: idempotencyKey || `TAG-TRANS-${tagId}-${Date.now()}`,
       }
     );
 
     if (dbError) {
-      // Return 422 Unprocessable Entity if Tag State Machine Invariant is violated
-      if (dbError.message?.includes("Tag Invariant Violation")) {
-        return NextResponse.json({ error: dbError.message }, { status: 422 });
-      }
-
       return NextResponse.json({
-        success: true,
-        tagId,
-        status: newStatus,
-        note: "Transition recorded in application audit trail.",
-      });
+        success: false,
+        code: "TRANSITION_REJECTED",
+        message: `Tag lifecycle transition failed: ${dbError.message}`,
+      }, { status: 422 });
     }
 
     return NextResponse.json({
       success: true,
+      code: "TRANSITION_COMPLETED",
       tagId,
       status: transitionResult,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Tag lifecycle transition failed" }, { status: 500 });
+    return NextResponse.json({
+      success: false,
+      code: "SERVER_ERROR",
+      message: error.message || "Tag lifecycle transition failed due to server error.",
+    }, { status: 500 });
   }
 }
