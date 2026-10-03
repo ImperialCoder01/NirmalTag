@@ -1,29 +1,9 @@
 -- ============================================================
 -- NIRMALTAG PRODUCTION IDENTITY BRIDGE: MIGRATION 20261004000009
--- Firebase Third-Party Auth -> Supabase PostgreSQL RLS Bridge
--- Fixes: auth.uid() 22P02 UUID casting crash on Firebase alphanumeric UIDs
+-- Firebase Third-Party Auth -> Supabase PostgreSQL RLS Bridge (Approach B)
+-- Non-invasive Application-Level Firebase Identity Bridge
+-- Leaves native Supabase auth.uid() 100% UNTOUCHED
 -- ============================================================
-
--- ------------------------------------------------------------
--- 0. HARDEN SUPABASE BUILT-IN auth.uid() AGAINST NON-UUID SUB CLAIMS
--- Prevents PostgreSQL Error 22P02 when Firebase JWT contains alphanumeric sub string
--- ------------------------------------------------------------
-CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid AS $$
-DECLARE
-    v_sub TEXT;
-BEGIN
-    BEGIN
-        v_sub := NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub';
-    EXCEPTION WHEN OTHERS THEN
-        RETURN NULL;
-    END;
-
-    IF v_sub IS NOT NULL AND v_sub ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
-        RETURN v_sub::uuid;
-    END IF;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql STABLE;
 
 -- ------------------------------------------------------------
 -- 1. CENTRALIZED FIREBASE IDENTITY HELPER FUNCTIONS
@@ -64,7 +44,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public;
 
--- Hardened JWT subject helper (replaces auth.uid fallback with get_authenticated_profile_id)
+-- Hardened JWT subject helper (replaces native auth.uid fallback with get_authenticated_profile_id)
 CREATE OR REPLACE FUNCTION get_auth_jwt_sub() RETURNS UUID AS $$
 BEGIN
     RETURN get_authenticated_profile_id();
@@ -92,6 +72,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- ------------------------------------------------------------
 -- 2. HARDENED ROW LEVEL SECURITY (RLS) POLICIES
+-- Replaces all auth.uid() references with get_authenticated_firebase_uid() / get_authenticated_profile_id()
 -- ------------------------------------------------------------
 
 -- PROFILES
