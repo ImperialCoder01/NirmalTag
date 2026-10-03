@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { 
   Layers, Plus, RefreshCw, Search, QrCode, 
-  ShieldAlert, Ban, FileSpreadsheet, Lock
+  ShieldAlert, Ban, FileSpreadsheet, Lock, AlertTriangle, CheckCircle2
 } from "lucide-react";
 
 export default function TagOfficerPage() {
@@ -25,6 +25,14 @@ export default function TagOfficerPage() {
     date: string;
     assigned: number;
   }>>([]);
+
+  const [inventorySummary, setInventorySummary] = useState<{
+    total_batches: number;
+    total_tags: number;
+    sum_batch_tags: number;
+    inventory_integrity_error: boolean;
+    counts: Record<string, number>;
+  } | null>(null);
 
   const [generatedQRs, setGeneratedQRs] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -49,26 +57,24 @@ export default function TagOfficerPage() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  // Fetch real registered batches from database
-  const fetchBatches = async () => {
+  // Fetch real registered batches and inventory summary from database
+  const fetchData = async () => {
     try {
       const token = await getIdToken();
       if (!token) return;
 
-      const res = await fetch("/api/v1/tag-batches", {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-        },
-      });
+      const headers = { "Authorization": `Bearer ${token}` };
 
-      if (res.ok) {
-        const data = await res.json();
+      // Fetch Batches
+      const resBatches = await fetch("/api/v1/tag-batches", { headers });
+      if (resBatches.ok) {
+        const data = await resBatches.json();
         if (data.success && Array.isArray(data.batches)) {
           const mapped = data.batches.map((b: any) => ({
-            id: b.batch_name || b.batch_number || b.id,
-            count: b.total_tags || b.total_quantity || 0,
+            id: b.batch_number || b.id,
+            count: b.total_quantity || b.total_tags || 0,
             category: wasteCategory,
-            ward: "Ward 42",
+            ward: b.ward_id ? `Ward ${b.ward_id.slice(0, 8)}` : "Ward 42",
             status: "REGISTERED",
             date: b.created_at ? new Date(b.created_at).toISOString().split("T")[0] : "2026-10-04",
             assigned: 0,
@@ -76,14 +82,23 @@ export default function TagOfficerPage() {
           setCreatedBatches(mapped);
         }
       }
+
+      // Fetch Reconciliation Summary
+      const resSummary = await fetch("/api/v1/tags/summary", { headers });
+      if (resSummary.ok) {
+        const sumData = await resSummary.json();
+        if (sumData.success && sumData.summary) {
+          setInventorySummary(sumData.summary);
+        }
+      }
     } catch (err) {
-      console.error("Failed to fetch batches:", err);
+      console.error("Failed to fetch inventory data:", err);
     }
   };
 
   useEffect(() => {
     if (user && (role === "TAG_OFFICER" || role === "SYSTEM_ADMIN")) {
-      fetchBatches();
+      fetchData();
     }
   }, [user, role]);
 
@@ -145,6 +160,8 @@ export default function TagOfficerPage() {
       }
 
       const batchName = `NT-BATCH-${Date.now().toString().slice(-6)}`;
+      const idempotencyKey = `BATCH-KEY-${batchName}`;
+
       const res = await fetch("/api/v1/tag-batches", {
         method: "POST",
         headers: { 
@@ -155,6 +172,7 @@ export default function TagOfficerPage() {
           batchName,
           quantity: batchCount,
           wardId: "123e4567-e89b-12d3-a456-426614174000",
+          idempotencyKey,
         }),
       });
 
@@ -168,17 +186,17 @@ export default function TagOfficerPage() {
 
       const result = data.result || {};
       const createdCount = result.tags_created || batchCount;
-      const startSerial = result.start_serial || "NT-SAN-2026-1000";
+      const startSerial = result.start_serial || "NT-SAN-2026-100000";
 
       const sampleCodes: string[] = Array.from({ length: Math.min(5, createdCount) }, (_, i) => {
         const parts = startSerial.split("-");
-        const baseSeq = parseInt(parts[parts.length - 1] || "1000", 10);
-        return `NT-SAN-2026-${baseSeq + i}`;
+        const baseSeq = parseInt(parts[parts.length - 1] || "100000", 10);
+        return `NT-SAN-2026-${(baseSeq + i).toString().padStart(6, "0")}`;
       });
 
       setGeneratedQRs(sampleCodes);
       showNotification(`Authorized Tag Batch ${result.batch_name || batchName} created successfully with ${createdCount} tags!`, "success");
-      await fetchBatches();
+      await fetchData();
     } catch (err: any) {
       showNotification(err.message || "Failed to submit batch creation request.", "error");
     } finally {
@@ -271,6 +289,7 @@ export default function TagOfficerPage() {
 
       setTagDetails({ ...tagDetails, status: newStatus });
       showNotification(`Tag ${tagDetails.code} status successfully updated to ${newStatus}.`, "success");
+      await fetchData();
     } catch (err: any) {
       showNotification(err.message || "Tag lifecycle status update failed.", "error");
     }
@@ -327,6 +346,41 @@ export default function TagOfficerPage() {
           </span>
         </div>
       </div>
+
+      {/* Database Reconciliation Summary Bar */}
+      {inventorySummary && (
+        <div className={`p-6 rounded-2xl border ${
+          inventorySummary.inventory_integrity_error ? "bg-red-50 border-red-200 text-red-900" : "bg-emerald-50 border-emerald-200 text-emerald-950"
+        } shadow-sm space-y-4`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-bold text-sm">
+              {inventorySummary.inventory_integrity_error ? (
+                <>
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  <span>INVENTORY INTEGRITY MISMATCH DETECTED IN DATABASE</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <span>Database Inventory Integrity Reconciled (100% Match)</span>
+                </>
+              )}
+            </div>
+            <span className="text-xs font-mono font-bold">
+              Batches: {inventorySummary.total_batches} | Physical Tags: {inventorySummary.total_tags.toLocaleString()}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 text-xs">
+            {Object.entries(inventorySummary.counts || {}).map(([st, cnt]) => (
+              <div key={st} className="p-2.5 bg-white/80 backdrop-blur rounded-xl border border-slate-200 text-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase">{st}</div>
+                <div className="text-sm font-extrabold text-slate-900">{cnt.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -425,7 +479,7 @@ export default function TagOfficerPage() {
             <form onSubmit={handleSearchTag} className="flex gap-2">
               <input
                 type="text"
-                placeholder="Enter tag serial code (e.g. NT-SAN-2026-1045) or Tag UUID"
+                placeholder="Enter tag serial code (e.g. NT-SAN-2026-100045) or Tag UUID"
                 value={searchedTagCode}
                 onChange={(e) => setSearchedTagCode(e.target.value)}
                 className="flex-1 text-xs p-2.5 rounded-xl border border-slate-300 font-mono"

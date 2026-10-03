@@ -37,8 +37,7 @@ async function applyMigration(fileName) {
 
 async function run() {
   const targetFiles = [
-    '20261003000004_iteration1_5_security_and_policies.sql',
-    '20261003000005_iteration1_6_security_hardening.sql'
+    '20261003000006_iteration5_1_tag_supply_chain_fixes.sql'
   ];
 
   for (const file of targetFiles) {
@@ -48,7 +47,7 @@ async function run() {
       process.exit(1);
     }
   }
-  console.log('Target database security migrations 0004 and 0005 applied successfully!');
+  console.log('Target database migration 0006 applied successfully!');
 }
 
 run();
