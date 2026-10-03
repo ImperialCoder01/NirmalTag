@@ -1,0 +1,38 @@
+# NirmalTag Monorepo Root Git Ignore
+
+# Node / Web dependencies & builds
+web/node_modules/
+web/.next/
+web/out/
+web/build/
+web/.env*.local
+*.log
+
+# Android build outputs & local config
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/local.properties
+android/.idea/
+android/*.iml
+android/app/*.keystore
+android/app/*.jks
+
+# Supabase local environment
+supabase/.env
+supabase/.temp/
+
+# Environment files and Secrets
+.env
+.env.local
+.env.production
+*.pem
+*.key
+google-services.json
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
