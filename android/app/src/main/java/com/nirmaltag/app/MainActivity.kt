@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
+import com.google.firebase.auth.FirebaseAuth
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -340,6 +341,8 @@ fun UserTypeAuthScreen(
     var colonyName by remember { mutableStateOf("Green Park Colony") }
     var hasConsent by remember { mutableStateOf(true) }
     var showDpdpDialog by remember { mutableStateOf(false) }
+    var isAuthenticating by remember { mutableStateOf(false) }
+    var authErrorMsg by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
     val scrollState = rememberScrollState()
@@ -350,11 +353,9 @@ fun UserTypeAuthScreen(
             return
         }
         try {
-            // In-app Google Authentication trigger
             Toast.makeText(context, "Authenticating in-app with Google as ${selectedRole.label}...", Toast.LENGTH_SHORT).show()
             onAuthSuccess()
         } catch (_: Exception) {
-            // Browser Fallback with Deep Link redirect back to app
             val fallbackUrl = "https://nirmaltag.vercel.app/login?role=${selectedRole.name}&redirect=nirmaltag://auth-callback"
             val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl))
             context.startActivity(browserIntent)
@@ -382,6 +383,30 @@ fun UserTypeAuthScreen(
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF0F172A)
             )
+        }
+
+        // Error Feedback Alert Banner
+        authErrorMsg?.let { error ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFDC2626))
+                    Text(
+                        text = error,
+                        fontSize = 12.sp,
+                        color = Color(0xFF991B1B),
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
 
         // STEP 1: DROPDOWN ROLE SELECTION
@@ -707,22 +732,76 @@ fun UserTypeAuthScreen(
                             Toast.makeText(context, "Please agree to DPDP Act 2023 Privacy Policy.", Toast.LENGTH_SHORT).show()
                         } else if (userEmail.isBlank()) {
                             Toast.makeText(context, "Please enter your email address.", Toast.LENGTH_SHORT).show()
+                        } else if (password.isBlank()) {
+                            Toast.makeText(context, "Please enter your password.", Toast.LENGTH_SHORT).show()
                         } else {
-                            onAuthSuccess()
+                            isAuthenticating = true
+                            authErrorMsg = null
+                            val cleanEmail = userEmail.trim()
+                            val firebaseAuth = FirebaseAuth.getInstance()
+
+                            if (isSignUpMode) {
+                                firebaseAuth.createUserWithEmailAndPassword(cleanEmail, password)
+                                    .addOnSuccessListener { result ->
+                                        result.user?.getIdToken(true)?.addOnSuccessListener { tokenResult ->
+                                            isAuthenticating = false
+                                            if (!tokenResult.token.isNullOrEmpty()) {
+                                                onAuthSuccess()
+                                            } else {
+                                                authErrorMsg = "Failed to acquire valid Firebase identity token."
+                                            }
+                                        }?.addOnFailureListener { e ->
+                                            isAuthenticating = false
+                                            authErrorMsg = "Token Acquisition Error: ${e.localizedMessage}"
+                                        }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        isAuthenticating = false
+                                        authErrorMsg = "Sign Up Failed: ${e.localizedMessage}"
+                                    }
+                            } else {
+                                firebaseAuth.signInWithEmailAndPassword(cleanEmail, password)
+                                    .addOnSuccessListener { result ->
+                                        result.user?.getIdToken(true)?.addOnSuccessListener { tokenResult ->
+                                            isAuthenticating = false
+                                            if (!tokenResult.token.isNullOrEmpty()) {
+                                                onAuthSuccess()
+                                            } else {
+                                                authErrorMsg = "Failed to acquire valid Firebase identity token."
+                                            }
+                                        }?.addOnFailureListener { e ->
+                                            isAuthenticating = false
+                                            authErrorMsg = "Token Acquisition Error: ${e.localizedMessage}"
+                                        }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        isAuthenticating = false
+                                        authErrorMsg = "Authentication Failed: ${e.localizedMessage}"
+                                    }
+                            }
                         }
                     },
+                    enabled = !isAuthenticating,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C3A)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text(
-                        text = if (isSignUpMode) "Create Account as ${selectedRole.label}" else "Sign In as ${selectedRole.label}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = Color.White
-                    )
+                    if (isAuthenticating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color.White,
+                            strokeWidth = 2.5.dp
+                        )
+                    } else {
+                        Text(
+                            text = if (isSignUpMode) "Create Account as ${selectedRole.label}" else "Sign In as ${selectedRole.label}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = Color.White
+                        )
+                    }
                 }
             }
         }

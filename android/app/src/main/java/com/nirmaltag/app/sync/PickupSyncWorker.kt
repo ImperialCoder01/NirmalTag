@@ -9,6 +9,10 @@ import com.nirmaltag.app.data.local.PendingPickupEntity
 import com.nirmaltag.app.util.TagValidationUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.google.firebase.auth.FirebaseAuth
+import com.google.android.gms.tasks.Tasks
+import java.net.HttpURLConnection
+import java.net.URL
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -32,7 +36,6 @@ class PickupSyncWorker(
 
         for (pickup in pendingList) {
             try {
-                // If pickup is already in terminal state, skip processing
                 if (pickup.state == OfflinePickupState.SERVER_VERIFIED || pickup.state == OfflinePickupState.SERVER_REJECTED) {
                     continue
                 }
@@ -44,7 +47,6 @@ class PickupSyncWorker(
                     attemptMs = System.currentTimeMillis()
                 )
 
-                // 1. Evidence Integrity Verification (File existence & SHA-256 hash match)
                 val integrityCheck = verifyEvidenceIntegrity(pickup)
                 if (integrityCheck.isFailure) {
                     val fatalError = integrityCheck.exceptionOrNull()?.message ?: "EVIDENCE_INTEGRITY_FAILURE"
@@ -58,7 +60,6 @@ class PickupSyncWorker(
                     continue
                 }
 
-                // 2. Perform Authenticated RPC Synchronization
                 val syncResult = executeServerSync(pickup)
 
                 if (syncResult.isSuccess) {
@@ -125,7 +126,6 @@ class PickupSyncWorker(
     }
 
     private suspend fun executeServerSync(pickup: PendingPickupEntity): kotlin.Result<String> {
-        // Enforces client evidence sync contract with backend process_verified_pickup_transaction_v2
         if (pickup.tagSerialCode.startsWith("NT-INVALID")) {
             return kotlin.Result.failure(Exception("TAG_INVALID_STATE: Tag is not in eligible state for pickup finalization"))
         }
@@ -136,9 +136,67 @@ class PickupSyncWorker(
             return kotlin.Result.failure(Exception("HOUSEHOLD_MISMATCH: Tag assigned household does not match request"))
         }
 
-        // Authenticated transmission simulation
-        kotlinx.coroutines.delay(200)
-        return kotlin.Result.success("SUPABASE-TXN-2026-${pickup.idempotencyKey.take(8)}")
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        if (firebaseUser == null) {
+            return kotlin.Result.failure(Exception("UNAUTHORIZED: No active authenticated Firebase user session found on device."))
+        }
+
+        val idToken = try {
+            val tokenTask = firebaseUser.getIdToken(true)
+            val result = Tasks.await(tokenTask)
+            result.token
+        } catch (e: Exception) {
+            return kotlin.Result.failure(Exception("UNAUTHORIZED: Failed to acquire current Firebase ID token: ${e.localizedMessage}"))
+        }
+
+        if (idToken.isNullOrEmpty()) {
+            return kotlin.Result.failure(Exception("UNAUTHORIZED: Acquired Firebase ID token is null or empty."))
+        }
+
+        val syncEndpoint = "https://ubphrqumpqdifupwbvpe.supabase.co/rest/v1/rpc/process_verified_pickup_transaction_v2"
+        val supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVicGhycXVtcHFkaWZ1cHdidnBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMTcyNjksImV4cCI6MjEwNjU5MzI2OX0.J82YJ603tZc1X8n4PZ7X1rK3L7Z"
+
+        try {
+            val url = URL(syncEndpoint)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("apikey", supabaseAnonKey)
+            connection.setRequestProperty("Authorization", "Bearer $idToken")
+            connection.doOutput = true
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
+
+            val payloadJson = """
+                {
+                    "p_pickup_id": "${pickup.localPickupId}",
+                    "p_tag_id": "${pickup.tagSerialCode}",
+                    "p_collector_profile_id": "${firebaseUser.uid}",
+                    "p_idempotency_key": "${pickup.idempotencyKey}"
+                }
+            """.trimIndent()
+
+            connection.outputStream.use { os ->
+                os.write(payloadJson.toByteArray(Charsets.UTF_8))
+            }
+
+            val statusCode = connection.responseCode
+            if (statusCode in 200..299) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                return kotlin.Result.success("SUPABASE-TXN-${pickup.idempotencyKey.take(8)}")
+            } else {
+                val errorMsg = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $statusCode"
+                if (statusCode == 401 || statusCode == 403) {
+                    return kotlin.Result.failure(Exception("UNAUTHORIZED: Server rejected credentials ($statusCode): $errorMsg"))
+                } else if (statusCode in 400..499) {
+                    return kotlin.Result.failure(Exception("PERMANENT_REJECT: Server rejected payload ($statusCode): $errorMsg"))
+                } else {
+                    return kotlin.Result.failure(Exception("SERVER_ERROR: Server returned HTTP $statusCode: $errorMsg"))
+                }
+            }
+        } catch (e: Exception) {
+            return kotlin.Result.failure(Exception("NETWORK_ERROR: ${e.localizedMessage}"))
+        }
     }
 
     private fun isFatalServerRejection(errorMsg: String): Boolean {
