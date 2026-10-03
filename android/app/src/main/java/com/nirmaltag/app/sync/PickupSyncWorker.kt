@@ -154,14 +154,16 @@ class PickupSyncWorker(
         }
 
         val syncEndpoint = "https://ubphrqumpqdifupwbvpe.supabase.co/rest/v1/rpc/process_verified_pickup_transaction_v2"
-        val supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVicGhycXVtcHFkaWZ1cHdidnBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMTcyNjksImV4cCI6MjEwNjU5MzI2OX0.J82YJ603tZc1X8n4PZ7X1rK3L7Z"
+        val supabaseApiKey = com.nirmaltag.app.BuildConfig.SUPABASE_PUBLISHABLE_KEY.ifEmpty {
+            "sb_publishable_MVBto2fM-eKyqT_R5A-g7Q_GDzJKswE"
+        }
 
         try {
             val url = URL(syncEndpoint)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("apikey", supabaseAnonKey)
+            connection.setRequestProperty("apikey", supabaseApiKey)
             connection.setRequestProperty("Authorization", "Bearer $idToken")
             connection.doOutput = true
             connection.connectTimeout = 10000

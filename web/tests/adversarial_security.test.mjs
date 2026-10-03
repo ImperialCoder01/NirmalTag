@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ubphrqumpqdifupwbvpe.supabase.co";
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVicGhycXVtcHFkaWZ1cHdidnBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMjUwNzYsImV4cCI6MjEwNjYwMTA3Nn0.gYl7pOeKSc_8YxTnDczFgPkcLaA3qMIH7DEggpulH7U";
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_MVBto2fM-eKyqT_R5A-g7Q_GDzJKswE";
 
 const anonClient = createClient(supabaseUrl, anonKey);
 
