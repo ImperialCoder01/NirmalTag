@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 export default function RWAPage() {
-  const { role, setRole } = useAuth();
+  const { user, role, setRole } = useAuth();
 
   // State
   const [registeredHouseholds, setRegisteredHouseholds] = useState([
@@ -105,8 +105,12 @@ export default function RWAPage() {
             <Building2 className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Resident Welfare Association (RWA) Portal</h1>
-            <p className="text-xs text-slate-500">Rohini Sector 7 RWA • Registration No: RWA-DL-2024-890 • MCD Ward 42</p>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Resident Welfare Association (RWA) Portal {user ? `(${user.displayName || user.email?.split("@")[0]})` : ""}
+            </h1>
+            <p className="text-xs text-slate-500">
+              {user?.email ? `Admin: ${user.email} • ` : ""}Rohini Sector 7 RWA • Registration No: RWA-DL-2024-890 • MCD Ward 42
+            </p>
           </div>
         </div>
 

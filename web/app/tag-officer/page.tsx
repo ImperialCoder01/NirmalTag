@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 export default function TagOfficerPage() {
-  const { role, setRole } = useAuth();
+  const { user, role, setRole } = useAuth();
 
   // Form State
   const [batchCount, setBatchCount] = useState<number>(1000);
@@ -166,8 +166,12 @@ export default function TagOfficerPage() {
             <Layers className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Tag Officer Inventory & Batch Management</h1>
-            <p className="text-xs text-slate-500">Authoritative batch tag creation, inventory reconciliation, distribution, and status override.</p>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Tag Officer Inventory & Batch Management {user ? `(${user.displayName || user.email?.split("@")[0]})` : ""}
+            </h1>
+            <p className="text-xs text-slate-500">
+              {user?.email ? `Logged as: ${user.email} • ` : ""}Authoritative batch tag creation, inventory reconciliation, distribution, and status override.
+            </p>
           </div>
         </div>
 

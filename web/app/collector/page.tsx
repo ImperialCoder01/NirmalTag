@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 export default function CollectorPage() {
-  const { role, setRole } = useAuth();
+  const { user, role, setRole } = useAuth();
 
   // State
   const [scannedCode, setScannedCode] = useState<string>("");
@@ -158,8 +158,12 @@ export default function CollectorPage() {
             <Image src="/logo.jpg" alt="Logo" width={40} height={40} className="object-cover" />
           </div>
           <div>
-            <h1 className="font-bold text-sm">Collector Field App</h1>
-            <p className="text-[11px] text-slate-400">Worker ID: COL-4092 • MCD Ward 42</p>
+            <h1 className="font-bold text-sm">
+              Collector Field App {user ? `(${user.displayName || user.email?.split("@")[0]})` : ""}
+            </h1>
+            <p className="text-[11px] text-slate-400">
+              {user?.email ? user.email : "Worker ID: COL-4092"} • MCD Ward 42
+            </p>
           </div>
         </div>
 

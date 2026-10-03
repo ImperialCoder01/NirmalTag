@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 export default function SystemAdminPage() {
-  const { role, setRole } = useAuth();
+  const { user, role, setRole } = useAuth();
 
   // State
   const [usersList, setUsersList] = useState([
@@ -142,8 +142,12 @@ export default function SystemAdminPage() {
             <Image src="/logo.jpg" alt="Logo" width={48} height={48} className="object-cover" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">System Administration & Security Control</h1>
-            <p className="text-xs text-slate-400">RBAC Role Provisioning, Immutable Security Audit Log Viewer, & Policy Engine Controls</p>
+            <h1 className="text-2xl font-bold tracking-tight">
+              System Administration & Security Control {user ? `(${user.displayName || user.email?.split("@")[0]})` : ""}
+            </h1>
+            <p className="text-xs text-slate-400">
+              {user?.email ? `Admin Identity: ${user.email} • ` : ""}RBAC Role Provisioning, Immutable Security Audit Log Viewer, & Policy Engine Controls
+            </p>
           </div>
         </div>
 

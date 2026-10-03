@@ -148,8 +148,12 @@ export default function HouseholdPage() {
               <Image src="/logo.jpg" alt="Logo" width={64} height={64} className="object-cover" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900">Welcome, Household Resident</h1>
-              <p className="text-xs text-slate-500">Rohini Sector 7, Block B, Flat 402 • MCD Ward 42</p>
+              <h1 className="text-xl font-bold text-slate-900">
+                Welcome, {user ? (user.displayName || user.email?.split("@")[0] || "Household Resident") : "Household Resident"}
+              </h1>
+              <p className="text-xs text-slate-500">
+                {user?.email ? `Account: ${user.email} • ` : ""}Rohini Sector 7, Block B, Flat 402 • MCD Ward 42
+              </p>
               <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Verified Household Account (DPDP Compliant)</span>

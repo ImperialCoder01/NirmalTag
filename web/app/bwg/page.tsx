@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 export default function BWGPage() {
-  const { role, setRole } = useAuth();
+  const { user, role, setRole } = useAuth();
 
   // State
   const [wasteLogs, setWasteLogs] = useState([
@@ -99,8 +99,12 @@ export default function BWGPage() {
             <Building className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Bulk Waste Generator (BWG) Portal</h1>
-            <p className="text-xs text-slate-500">Commercial & Institutional Special-Care Waste Compliance Hub • MCD Registration BWG-2026-902</p>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Bulk Waste Generator (BWG) Portal {user ? `(${user.displayName || user.email?.split("@")[0]})` : ""}
+            </h1>
+            <p className="text-xs text-slate-500">
+              {user?.email ? `Account: ${user.email} • ` : ""}Commercial & Institutional Special-Care Waste Compliance Hub • MCD Registration BWG-2026-902
+            </p>
           </div>
         </div>
 

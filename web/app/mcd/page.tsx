@@ -10,7 +10,7 @@ import {
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 export default function MCDDashboardPage() {
-  const { role, setRole } = useAuth();
+  const { user, role, setRole } = useAuth();
 
   // State
   const [selectedWardFilter, setSelectedWardFilter] = useState<string>("ALL");
@@ -106,12 +106,16 @@ export default function MCDDashboardPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">MCD Municipal Executive Command</h1>
+              <h1 className="text-2xl font-bold tracking-tight">
+                MCD Municipal Executive Command {user ? `(${user.displayName || user.email?.split("@")[0]})` : ""}
+              </h1>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500 text-slate-950 uppercase">
                 Zone: North Delhi
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1">Real-Time Civic Compliance & Special-Care Waste Aggregated Telemetry</p>
+            <p className="text-xs text-slate-400 mt-1">
+              {user?.email ? `Officer: ${user.email} • ` : ""}Real-Time Civic Compliance & Special-Care Waste Aggregated Telemetry
+            </p>
           </div>
         </div>
 
