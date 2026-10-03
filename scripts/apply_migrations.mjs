@@ -37,7 +37,7 @@ async function applyMigration(fileName) {
 
 async function run() {
   const targetFiles = [
-    '20261003000006_iteration5_1_tag_supply_chain_fixes.sql'
+    '20261003000007_iteration6_household_rwa_ownership.sql'
   ];
 
   for (const file of targetFiles) {
@@ -47,7 +47,7 @@ async function run() {
       process.exit(1);
     }
   }
-  console.log('Target database migration 0006 applied successfully!');
+  console.log('Target database migration 0007 applied successfully!');
 }
 
 run();
