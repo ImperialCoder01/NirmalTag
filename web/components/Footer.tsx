@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ShieldCheck, Mail, Building2 } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -28,16 +28,16 @@ export default function Footer() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-6 text-slate-300 font-medium">
-            <Link href="/household" className="hover:text-emerald-400 transition-colors">Household Portal</Link>
-            <Link href="/collector" className="hover:text-emerald-400 transition-colors">Collector Workflow</Link>
-            <Link href="/tag-officer" className="hover:text-emerald-400 transition-colors">Tag Officer Batch Hub</Link>
-            <Link href="/mcd" className="hover:text-emerald-400 transition-colors">MCD Analytics</Link>
-            <Link href="/admin" className="hover:text-emerald-400 transition-colors">System Admin</Link>
+          <div className="flex flex-wrap gap-6 text-slate-300 font-medium text-xs">
+            <Link href="/" className="hover:text-emerald-400 transition-colors">Home</Link>
+            <Link href="/privacy" className="hover:text-emerald-400 transition-colors">Privacy Policy (DPDP 2023)</Link>
+            <Link href="/terms" className="hover:text-emerald-400 transition-colors">Terms of Service</Link>
+            <Link href="/cookies" className="hover:text-emerald-400 transition-colors">Cookie Policy</Link>
+            <Link href="/refund-policy" className="hover:text-emerald-400 transition-colors">Refund & Credit Policy</Link>
           </div>
         </div>
 
-        {/* Legal & Compliance Footer Links */}
+        {/* Business & Grievance Details */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2 text-xs">
           <div className="space-y-2">
             <span className="font-bold text-slate-200 uppercase tracking-wider text-[11px]">Business Details & Office</span>
@@ -57,12 +57,12 @@ export default function Footer() {
           </div>
 
           <div className="space-y-2">
-            <span className="font-bold text-slate-200 uppercase tracking-wider text-[11px]">Legal Policies (Public Access)</span>
+            <span className="font-bold text-slate-200 uppercase tracking-wider text-[11px]">Public Legal Documentation</span>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-300 text-[11px] font-medium">
-              <Link href="/privacy" className="hover:text-emerald-400 underline transition-colors">Privacy Policy (DPDP 2023)</Link>
-              <Link href="/terms" className="hover:text-emerald-400 underline transition-colors">Terms of Service</Link>
-              <Link href="/cookies" className="hover:text-emerald-400 underline transition-colors">Cookie Policy</Link>
-              <Link href="/refund-policy" className="hover:text-emerald-400 underline transition-colors">Refund & Credit Policy</Link>
+              <Link href="/privacy" className="hover:text-emerald-400 underline transition-colors">Privacy Policy</Link>
+              <Link href="/terms" className="hover:text-emerald-400 underline transition-colors">Terms</Link>
+              <Link href="/cookies" className="hover:text-emerald-400 underline transition-colors">Cookies</Link>
+              <Link href="/refund-policy" className="hover:text-emerald-400 underline transition-colors">Refunds</Link>
             </div>
           </div>
         </div>

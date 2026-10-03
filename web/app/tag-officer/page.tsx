@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { 
-  Layers, Plus, RefreshCw, CheckCircle2, AlertTriangle, Search, QrCode, 
-  Download, ShieldAlert, Ban, Check, AlertCircle, FileSpreadsheet
+  Layers, Plus, RefreshCw, Search, QrCode, 
+  ShieldAlert, Ban, FileSpreadsheet, Lock
 } from "lucide-react";
 
 export default function TagOfficerPage() {
-  const { user, role, setRole } = useAuth();
+  const { user, role } = useAuth();
 
   // Form State
   const [batchCount, setBatchCount] = useState<number>(1000);
@@ -43,12 +44,56 @@ export default function TagOfficerPage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  // STRICT ACCESS CONTROL GUARD
+  if (!user) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">Authentication Required</h1>
+          <p className="text-xs text-slate-500">
+            Please sign in to your authorized account to access the Tag Officer Portal.
+          </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-md"
+          >
+            Sign In to Account
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (role !== "TAG_OFFICER" && role !== "SYSTEM_ADMIN") {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">403 - Access Denied</h1>
+          <p className="text-xs text-slate-500">
+            Your account is assigned the role of <strong className="text-slate-900">{role.replace("_", " ")}</strong>. You do not have authorization to access the Tag Officer portal.
+          </p>
+          <Link
+            href={`/${role.toLowerCase().replace("_", "-")}`}
+            className="inline-flex items-center justify-center px-6 py-3 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors shadow-md"
+          >
+            Return to My Authorized Portal
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const handleCreateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
 
     try {
-      // Call API
       const res = await fetch("/api/v1/tag-batches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -90,7 +135,6 @@ export default function TagOfficerPage() {
     e.preventDefault();
     if (!searchedTagCode.trim()) return;
 
-    // Simulate search lookup
     const code = searchedTagCode.trim().toUpperCase();
     setTagDetails({
       code: code,
@@ -132,24 +176,6 @@ export default function TagOfficerPage() {
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
-      {/* Role Banner / Guard Check */}
-      {role !== "TAG_OFFICER" && (
-        <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0" />
-            <span className="text-xs font-semibold">
-              Your active role is set as <strong>{role.replace("_", " ")}</strong>. You are previewing the Tag Officer Portal.
-            </span>
-          </div>
-          <button
-            onClick={() => setRole("TAG_OFFICER")}
-            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex-shrink-0"
-          >
-            Switch to Tag Officer Portal
-          </button>
-        </div>
-      )}
-
       {/* Toast Notification */}
       {notification && (
         <div className={`p-4 rounded-xl text-xs font-bold shadow-lg ${
@@ -167,10 +193,10 @@ export default function TagOfficerPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
-              Tag Officer Inventory & Batch Management {user ? `(${user.displayName || user.email?.split("@")[0]})` : ""}
+              Tag Officer Inventory & Batch Management ({user.displayName || user.email?.split("@")[0]})
             </h1>
             <p className="text-xs text-slate-500">
-              {user?.email ? `Logged as: ${user.email} • ` : ""}Authoritative batch tag creation, inventory reconciliation, distribution, and status override.
+              Logged as: {user.email} • Authoritative batch tag creation, inventory reconciliation, and status override.
             </p>
           </div>
         </div>

@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { 
-  Building, TrendingUp, CheckCircle2, AlertCircle, Plus, 
-  Download, ShieldAlert, X, Scale, FileText, QrCode
+  Building, Plus, Download, ShieldAlert, X, Scale, FileText, QrCode, Lock
 } from "lucide-react";
 
 export default function BWGPage() {
-  const { user, role, setRole } = useAuth();
+  const { user, role } = useAuth();
 
   // State
   const [wasteLogs, setWasteLogs] = useState([
@@ -36,6 +36,51 @@ export default function BWGPage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  // STRICT ACCESS CONTROL GUARD
+  if (!user) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">Authentication Required</h1>
+          <p className="text-xs text-slate-500">
+            Please sign in to your authorized account to access the BWG Admin Portal.
+          </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-md"
+          >
+            Sign In to Account
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (role !== "BWG_ADMIN" && role !== "SYSTEM_ADMIN") {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">403 - Access Denied</h1>
+          <p className="text-xs text-slate-500">
+            Your account is assigned the role of <strong className="text-slate-900">{role.replace("_", " ")}</strong>. You do not have authorization to access the BWG Administrator portal.
+          </p>
+          <Link
+            href={`/${role.toLowerCase().replace("_", "-")}`}
+            className="inline-flex items-center justify-center px-6 py-3 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors shadow-md"
+          >
+            Return to My Authorized Portal
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const handleAddWasteLog = (e: React.FormEvent) => {
     e.preventDefault();
     const newLog = {
@@ -59,30 +104,80 @@ export default function BWGPage() {
     showNotification(`Requested ${requestedTagQty} bulk industrial tags from Tag Officer. Allocation approved!`);
   };
 
+  // REAL MCD COMPLIANCE CERTIFICATE GENERATION & FILE DOWNLOAD TRIGGER
   const downloadCertificate = () => {
-    showNotification("MCD Bulk Waste Compliance Certificate (PDF) generated & downloaded.");
+    const certificateHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MCD Special Waste Compliance Certificate 2026</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; padding: 40px; color: #0f172a; }
+    .cert-card { max-width: 800px; margin: 0 auto; background: #ffffff; border: 12px solid #0D5C3A; padding: 40px; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); position: relative; }
+    .header { text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 24px; }
+    .title { font-size: 26px; font-weight: 900; color: #0D5C3A; text-transform: uppercase; letter-spacing: 1px; }
+    .subtitle { font-size: 14px; font-weight: 700; color: #475569; margin-top: 6px; }
+    .badge { display: inline-block; background: #dcfce7; color: #166534; font-weight: 800; font-size: 13px; padding: 6px 18px; border-radius: 9999px; margin-top: 14px; border: 1px solid #bbf7d0; }
+    .body-content { margin-top: 32px; line-height: 1.8; font-size: 14px; }
+    .entity-box { background: #f8fafc; padding: 24px; border-radius: 14px; margin: 24px 0; border-left: 6px solid #0D5C3A; border: 1px solid #e2e8f0; border-left-width: 6px; }
+    .field { margin-bottom: 10px; font-size: 14px; }
+    .field label { font-weight: 800; color: #1e293b; display: inline-block; width: 220px; }
+    .footer { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; border-top: 2px solid #e2e8f0; padding-top: 24px; }
+    .stamp { border: 2px dashed #0D5C3A; color: #0D5C3A; padding: 14px 24px; font-weight: 900; border-radius: 12px; font-size: 12px; text-align: center; background: #f0fdf4; }
+  </style>
+</head>
+<body>
+  <div class="cert-card">
+    <div class="header">
+      <div class="title">Municipal Corporation of Delhi (MCD)</div>
+      <div class="subtitle">Department of Environmental & Special Care Waste Management</div>
+      <div class="badge">OFFICIAL GRADE A COMPLIANCE CERTIFICATE • DPDP ACT 2023 CERTIFIED</div>
+    </div>
+
+    <div class="body-content">
+      <p>This is an official municipal compliance certificate verifying that the Bulk Waste Generator (BWG) entity specified below operates in full compliance with MCD Source Segregation Directives and National Solid Waste Rules 2026.</p>
+
+      <div class="entity-box">
+        <div class="field"><label>Registered Entity Name:</label> ${user?.displayName || "Commercial & Institutional Complex #902"}</div>
+        <div class="field"><label>Account Email Identity:</label> ${user?.email || "bwg.admin@nirmaltag.org"}</div>
+        <div class="field"><label>MCD Registration ID:</label> BWG-2026-902</div>
+        <div class="field"><label>Municipal Zone & Ward:</label> MCD Ward 42, Rohini Zone, New Delhi 110085</div>
+        <div class="field"><label>Compliance Grade:</label> GRADE A (100% Segregated at Source)</div>
+        <div class="field"><label>Certificate Serial Number:</label> MCD/BWG/CERT/2026/0492</div>
+        <div class="field"><label>Issuance Date:</label> ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+      </div>
+
+      <p><strong>Municipal Benefit Entitlement:</strong> This entity is certified eligible for a 5% Municipal Sanitation Tax Rebate for maintaining continuous source-level segregation of sanitary & special-care waste streams.</p>
+    </div>
+
+    <div class="footer">
+      <div>
+        <div style="font-weight: 800; font-size: 15px; color: #0f172a;">Dr. Rajesh V. Sharma</div>
+        <div style="font-size: 12px; color: #64748b; margin-top: 2px;">Chief Municipal Health Officer, MCD North Zone</div>
+      </div>
+      <div class="stamp">
+        MCD AUTHORIZED VERIFIED SEAL<br>
+        <span style="font-size: 10px; font-weight: 600; color: #166534;">NirmalTag Digital Ledger ID: NMT-CERT-902</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([certificateHTML], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `MCD_BWG_Compliance_Certificate_BWG-2026-902.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showNotification("MCD Bulk Waste Compliance Certificate generated & downloaded successfully!");
   };
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
-      {/* Role Banner / Guard Check */}
-      {role !== "BWG_ADMIN" && (
-        <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0" />
-            <span className="text-xs font-semibold">
-              Your active role is set as <strong>{role.replace("_", " ")}</strong>. You are previewing the BWG Administrator Portal.
-            </span>
-          </div>
-          <button
-            onClick={() => setRole("BWG_ADMIN")}
-            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex-shrink-0"
-          >
-            Switch to BWG Admin Portal
-          </button>
-        </div>
-      )}
-
       {/* Toast Notification */}
       {notification && (
         <div className={`p-4 rounded-xl text-xs font-bold shadow-lg ${
@@ -100,10 +195,10 @@ export default function BWGPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
-              Bulk Waste Generator (BWG) Portal {user ? `(${user.displayName || user.email?.split("@")[0]})` : ""}
+              Bulk Waste Generator (BWG) Portal ({user.displayName || user.email?.split("@")[0]})
             </h1>
             <p className="text-xs text-slate-500">
-              {user?.email ? `Account: ${user.email} • ` : ""}Commercial & Institutional Special-Care Waste Compliance Hub • MCD Registration BWG-2026-902
+              Account: {user.email} • Commercial & Institutional Special-Care Waste Compliance Hub • MCD Registration BWG-2026-902
             </p>
           </div>
         </div>

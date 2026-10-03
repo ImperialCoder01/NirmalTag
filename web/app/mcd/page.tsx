@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { 
-  Building2, TrendingUp, ShieldCheck, AlertCircle, BarChart3, CheckCircle2, 
-  ShieldAlert, Filter, Send, X, Check, ThumbsUp, ThumbsDown
+  TrendingUp, AlertCircle, BarChart3, 
+  ShieldAlert, Filter, Send, X, ThumbsUp, ThumbsDown, Lock
 } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 export default function MCDDashboardPage() {
-  const { user, role, setRole } = useAuth();
+  const { user, role } = useAuth();
 
   // State
   const [selectedWardFilter, setSelectedWardFilter] = useState<string>("ALL");
@@ -41,8 +42,52 @@ export default function MCDDashboardPage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  // STRICT ACCESS CONTROL GUARD
+  if (!user) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">Authentication Required</h1>
+          <p className="text-xs text-slate-500">
+            Please sign in to your authorized account to access the MCD Municipal Officer Portal.
+          </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-md"
+          >
+            Sign In to Account
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (role !== "MCD_OFFICER" && role !== "SYSTEM_ADMIN") {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">403 - Access Denied</h1>
+          <p className="text-xs text-slate-500">
+            Your account is assigned the role of <strong className="text-slate-900">{role.replace("_", " ")}</strong>. You do not have authorization to access the MCD Officer portal.
+          </p>
+          <Link
+            href={`/${role.toLowerCase().replace("_", "-")}`}
+            className="inline-flex items-center justify-center px-6 py-3 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors shadow-md"
+          >
+            Return to My Authorized Portal
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const handleResolveDispute = (id: string, action: "APPROVE" | "REJECT") => {
-    const target = disputesQueue.find(d => d.id === id);
     setDisputesQueue(disputesQueue.filter(d => d.id !== id));
 
     if (action === "APPROVE") {
@@ -71,24 +116,6 @@ export default function MCDDashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
-      {/* Role Banner / Guard Check */}
-      {role !== "MCD_OFFICER" && (
-        <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0" />
-            <span className="text-xs font-semibold">
-              Your active role is set as <strong>{role.replace("_", " ")}</strong>. You are previewing the MCD Municipal Officer Portal.
-            </span>
-          </div>
-          <button
-            onClick={() => setRole("MCD_OFFICER")}
-            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex-shrink-0"
-          >
-            Switch to MCD Officer Portal
-          </button>
-        </div>
-      )}
-
       {/* Toast Notification */}
       {notification && (
         <div className={`p-4 rounded-xl text-xs font-bold shadow-lg ${
@@ -107,14 +134,14 @@ export default function MCDDashboardPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">
-                MCD Municipal Executive Command {user ? `(${user.displayName || user.email?.split("@")[0]})` : ""}
+                MCD Municipal Executive Command ({user.displayName || user.email?.split("@")[0]})
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500 text-slate-950 uppercase">
                 Zone: North Delhi
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              {user?.email ? `Officer: ${user.email} • ` : ""}Real-Time Civic Compliance & Special-Care Waste Aggregated Telemetry
+              Officer: {user.email} • Real-Time Civic Compliance & Special-Care Waste Telemetry
             </p>
           </div>
         </div>

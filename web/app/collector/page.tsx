@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { useAuth, UserRole } from "@/lib/auth-context";
+import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 import { 
-  QrCode, Camera, CheckCircle2, AlertOctagon, RefreshCw, 
-  Smartphone, Wifi, WifiOff, Wallet, ShieldAlert, ArrowRight, UploadCloud, Check
+  QrCode, Camera, CheckCircle2, RefreshCw, 
+  Wifi, WifiOff, Wallet, ShieldAlert, UploadCloud, Lock
 } from "lucide-react";
 
 export default function CollectorPage() {
-  const { user, role, setRole } = useAuth();
+  const { user, role } = useAuth();
 
   // State
   const [scannedCode, setScannedCode] = useState<string>("");
@@ -32,6 +33,51 @@ export default function CollectorPage() {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
   };
+
+  // STRICT ACCESS CONTROL GUARD
+  if (!user) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">Authentication Required</h1>
+          <p className="text-xs text-slate-500">
+            Please sign in to your authorized account to access the Field Collector Portal.
+          </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-md"
+          >
+            Sign In to Account
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (role !== "COLLECTOR" && role !== "SYSTEM_ADMIN") {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">403 - Access Denied</h1>
+          <p className="text-xs text-slate-500">
+            Your account is assigned the role of <strong className="text-slate-900">{role.replace("_", " ")}</strong>. You do not have authorization to access the Field Collector portal.
+          </p>
+          <Link
+            href={`/${role.toLowerCase().replace("_", "-")}`}
+            className="inline-flex items-center justify-center px-6 py-3 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors shadow-md"
+          >
+            Return to My Authorized Portal
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const executeScan = (codeToScan: string) => {
     setScanState("SCANNING");
@@ -73,7 +119,7 @@ export default function CollectorPage() {
 
     // Call API / Sync
     try {
-      const res = await fetch("/api/v1/pickups/sync", {
+      await fetch("/api/v1/pickups/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -94,7 +140,6 @@ export default function CollectorPage() {
       setScanState("SUBMITTED");
       showNotification(`Pickup verified & saved! Tag ${scannedCode} set to CLOSED permanently.`);
     } catch (err) {
-      // Fallback local state if API network err
       setWalletBalance((prev) => prev + 2.0);
       setTotalPickupsCompleted((prev) => prev + 1);
       setScanState("SUBMITTED");
@@ -126,22 +171,6 @@ export default function CollectorPage() {
 
   return (
     <div className="max-w-md mx-auto py-6 px-4 space-y-6">
-      {/* Role Banner / Guard Check */}
-      {role !== "COLLECTOR" && (
-        <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs space-y-2">
-          <div className="flex items-center gap-1.5 font-bold">
-            <ShieldAlert className="w-4 h-4 text-amber-600" />
-            <span>Role Notice: Active role is {role.replace("_", " ")}</span>
-          </div>
-          <button
-            onClick={() => setRole("COLLECTOR")}
-            className="w-full py-1 bg-amber-600 text-white font-bold rounded-lg"
-          >
-            Switch to Field Collector Portal
-          </button>
-        </div>
-      )}
-
       {/* Toast Notification */}
       {notification && (
         <div className={`p-3 rounded-xl text-xs font-bold shadow-lg ${
@@ -159,10 +188,10 @@ export default function CollectorPage() {
           </div>
           <div>
             <h1 className="font-bold text-sm">
-              Collector Field App {user ? `(${user.displayName || user.email?.split("@")[0]})` : ""}
+              Collector Field App ({user.displayName || user.email?.split("@")[0]})
             </h1>
             <p className="text-[11px] text-slate-400">
-              {user?.email ? user.email : "Worker ID: COL-4092"} • MCD Ward 42
+              {user.email ? user.email : "Worker ID: COL-4092"} • MCD Ward 42
             </p>
           </div>
         </div>

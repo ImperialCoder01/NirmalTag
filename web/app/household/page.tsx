@@ -3,14 +3,14 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useAuth, UserRole, getRedirectPath } from "@/lib/auth-context";
+import { useAuth } from "@/lib/auth-context";
 import { 
   Coins, QrCode, Clock, Gift, CheckCircle2, Plus, 
-  Calendar, ShieldAlert, ShoppingBag, X, Sparkles, ArrowRight
+  Calendar, ShieldAlert, X, Lock
 } from "lucide-react";
 
 export default function HouseholdPage() {
-  const { user, role, setRole } = useAuth();
+  const { user, role } = useAuth();
 
   // State
   const [creditBalance, setCreditBalance] = useState<number>(140);
@@ -51,6 +51,51 @@ export default function HouseholdPage() {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
   };
+
+  // STRICT ACCESS CONTROL GUARD
+  if (!user) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">Authentication Required</h1>
+          <p className="text-xs text-slate-500">
+            Please sign in to your authorized account to access the Household Resident Portal.
+          </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-md"
+          >
+            Sign In to Account
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (role !== "HOUSEHOLD" && role !== "SYSTEM_ADMIN") {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">403 - Access Denied</h1>
+          <p className="text-xs text-slate-500">
+            Your account is assigned the role of <strong className="text-slate-900">{role.replace("_", " ")}</strong>. You do not have authorization to access the Household Resident portal.
+          </p>
+          <Link
+            href={`/${role.toLowerCase().replace("_", "-")}`}
+            className="inline-flex items-center justify-center px-6 py-3 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors shadow-md"
+          >
+            Return to My Authorized Portal
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const handleRegisterNewTag = (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,24 +156,6 @@ export default function HouseholdPage() {
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
-      {/* Role Banner / Guard Check */}
-      {role !== "HOUSEHOLD" && (
-        <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0" />
-            <span className="text-xs font-semibold">
-              Your active role is currently set as <strong>{role.replace("_", " ")}</strong>. You are previewing the Household Resident Portal.
-            </span>
-          </div>
-          <button
-            onClick={() => setRole("HOUSEHOLD")}
-            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex-shrink-0"
-          >
-            Switch Role to Household
-          </button>
-        </div>
-      )}
-
       {/* Toast Notification */}
       {notification && (
         <div className={`p-4 rounded-xl border text-xs font-bold shadow-lg transition-all ${
@@ -149,10 +176,10 @@ export default function HouseholdPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-slate-900">
-                Welcome, {user ? (user.displayName || user.email?.split("@")[0] || "Household Resident") : "Household Resident"}
+                Welcome, {user.displayName || user.email?.split("@")[0] || "Household Resident"}
               </h1>
               <p className="text-xs text-slate-500">
-                {user?.email ? `Account: ${user.email} • ` : ""}Rohini Sector 7, Block B, Flat 402 • MCD Ward 42
+                {user.email ? `Account: ${user.email} • ` : ""}Rohini Sector 7, Block B, Flat 402 • MCD Ward 42
               </p>
               <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />

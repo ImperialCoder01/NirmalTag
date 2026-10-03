@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useAuth, UserRole } from "@/lib/auth-context";
 import { 
-  ShieldCheck, Users, Key, FileText, Cpu, AlertTriangle, CheckCircle2, 
-  ShieldAlert, Search, Sliders, Plus, Download, X, Save
+  Users, Key, FileText, Cpu, 
+  ShieldAlert, Search, Sliders, Plus, Download, X, Save, Lock
 } from "lucide-react";
 
 export default function SystemAdminPage() {
-  const { user, role, setRole } = useAuth();
+  const { user, role } = useAuth();
 
   // State
   const [usersList, setUsersList] = useState([
@@ -48,6 +49,51 @@ export default function SystemAdminPage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  // STRICT ACCESS CONTROL GUARD
+  if (!user) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">Authentication Required</h1>
+          <p className="text-xs text-slate-500">
+            Please sign in to your authorized account to access System Administration.
+          </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-md"
+          >
+            Sign In to Account
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (role !== "SYSTEM_ADMIN") {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">403 - Access Denied</h1>
+          <p className="text-xs text-slate-500">
+            Your account is assigned the role of <strong className="text-slate-900">{role.replace("_", " ")}</strong>. You do not have authorization to access the System Administration portal.
+          </p>
+          <Link
+            href={`/${role.toLowerCase().replace("_", "-")}`}
+            className="inline-flex items-center justify-center px-6 py-3 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors shadow-md"
+          >
+            Return to My Authorized Portal
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const handleProvisionUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserEmail || !newUserName) return;
@@ -63,11 +109,10 @@ export default function SystemAdminPage() {
 
     setUsersList([newUser, ...usersList]);
 
-    // Log to security audit
     setAuditLogs([
       {
         id: `AUD-${Math.floor(902 + Math.random() * 100)}`,
-        actor: "sys_admin_main",
+        actor: user.email || "sys_admin_main",
         action: "USER_ROLE_GRANTED",
         target: `${newUser.email} (${newUser.role})`,
         time: new Date().toLocaleString(),
@@ -108,24 +153,6 @@ export default function SystemAdminPage() {
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
-      {/* Role Banner / Guard Check */}
-      {role !== "SYSTEM_ADMIN" && (
-        <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0" />
-            <span className="text-xs font-semibold">
-              Your active role is set as <strong>{role.replace("_", " ")}</strong>. You are previewing the System Administrator Portal.
-            </span>
-          </div>
-          <button
-            onClick={() => setRole("SYSTEM_ADMIN")}
-            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex-shrink-0"
-          >
-            Switch to System Admin Portal
-          </button>
-        </div>
-      )}
-
       {/* Toast Notification */}
       {notification && (
         <div className={`p-4 rounded-xl text-xs font-bold shadow-lg ${
@@ -143,10 +170,10 @@ export default function SystemAdminPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              System Administration & Security Control {user ? `(${user.displayName || user.email?.split("@")[0]})` : ""}
+              System Administration & Security Control ({user.displayName || user.email?.split("@")[0]})
             </h1>
             <p className="text-xs text-slate-400">
-              {user?.email ? `Admin Identity: ${user.email} • ` : ""}RBAC Role Provisioning, Immutable Security Audit Log Viewer, & Policy Engine Controls
+              Admin Identity: {user.email} • RBAC Role Provisioning, Security Audit Log Viewer, & Policy Engine
             </p>
           </div>
         </div>
