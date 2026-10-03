@@ -25,7 +25,12 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
+        val collectorTestEmail = localProps.getProperty("collector.test.email", "")
+        val collectorTestPassword = localProps.getProperty("collector.test.password", "")
+
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
+        buildConfigField("String", "COLLECTOR_TEST_EMAIL", "\"$collectorTestEmail\"")
+        buildConfigField("String", "COLLECTOR_TEST_PASSWORD", "\"$collectorTestPassword\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
