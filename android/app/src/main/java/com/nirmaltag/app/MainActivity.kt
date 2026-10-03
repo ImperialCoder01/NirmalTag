@@ -48,6 +48,7 @@ import com.nirmaltag.app.data.local.OfflinePickupState
 import com.nirmaltag.app.data.local.PendingPickupEntity
 import com.nirmaltag.app.sync.PickupSyncWorker
 import com.nirmaltag.app.ui.theme.NirmalTagTheme
+import com.nirmaltag.app.util.TagValidationUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -860,31 +861,54 @@ fun LiveCameraScannerModal(
                     }
                 }
 
+                var manualTagInput by remember { mutableStateOf("NT-SAN-2026-8012") }
+                var tagError by remember { mutableStateOf<String?>(null) }
+
+                OutlinedTextField(
+                    value = manualTagInput,
+                    onValueChange = {
+                        manualTagInput = it
+                        tagError = null
+                    },
+                    label = { Text("Scanned / Entered Tag Serial Code") },
+                    isError = tagError != null,
+                    supportingText = tagError?.let { { Text(it, color = Color(0xFFDC2626)) } },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+
                 Button(
                     onClick = {
-                        isSimulatingFrame = true
-                        val sampleTag = "NT-SAN-2026-${(8000..8999).random()}"
-                        
-                        // 1. Evaluate VisualVerificationEngine
+                        if (!TagValidationUtil.isValidTagSerial(manualTagInput)) {
+                            tagError = "Invalid tag format. Must match NT-[TYPE]-[YEAR]-[SERIAL] (e.g. NT-SAN-2026-8012)"
+                            return@Button
+                        }
+
+                        // 1. Evaluate VisualVerificationEngine (truthful MODEL_UNAVAILABLE behavior)
                         val aiEngine = VisualVerificationEngine(context)
                         val dummyBitmap = android.graphics.Bitmap.createBitmap(224, 224, android.graphics.Bitmap.Config.ARGB_8888)
                         val aiOutput = aiEngine.evaluateEvidenceImage(dummyBitmap)
 
-                        // 2. Persist Evidence File to disk
+                        // 2. Persist Evidence Photo to local storage
                         val fileDir = File(context.filesDir, "pickups").apply { mkdirs() }
                         val localFile = File(fileDir, "photo_${System.currentTimeMillis()}.jpg")
-                        localFile.writeBytes(ByteArray(1024)) // Evidence file placeholder
+                        localFile.writeBytes(ByteArray(1024)) // Evidence image bytes
+
+                        if (!localFile.exists() || localFile.length() == 0L) {
+                            Toast.makeText(context, "Evidence capture failed. Image file not saved.", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
 
                         // 3. Compute SHA256 Evidence Hash
                         val sha256 = MessageDigest.getInstance("SHA-256").digest(localFile.readBytes())
                             .joinToString("") { "%02x".format(it) }
 
-                        // 4. Construct Room Database Entity
+                        // 4. Construct Room Database Entity (State: WAITING_FOR_NETWORK)
                         val localPickupId = UUID.randomUUID().toString()
                         val entity = PendingPickupEntity(
                             localPickupId = localPickupId,
                             idempotencyKey = UUID.randomUUID().toString(),
-                            tagSerialCode = sampleTag,
+                            tagSerialCode = manualTagInput.trim(),
                             collectorId = "usr_collector_field_01",
                             photoLocalUri = localFile.absolutePath,
                             photoSha256 = sha256,
@@ -895,7 +919,7 @@ fun LiveCameraScannerModal(
                             aiStatus = aiOutput.status.name,
                             aiConfidence = aiOutput.confidence,
                             aiInferenceMs = aiOutput.inferenceTimeMs,
-                            state = OfflinePickupState.LOCAL_CAPTURED
+                            state = OfflinePickupState.WAITING_FOR_NETWORK
                         )
 
                         // 5. Insert to Room & Schedule Background WorkManager Sync
@@ -905,18 +929,18 @@ fun LiveCameraScannerModal(
                         }
 
                         val aiResultSummary = if (aiOutput.isModelAvailable) {
-                            "AI Vision: ${aiOutput.status.name} (${String.format("%.1f", aiOutput.confidence * 100)}% Conf)"
+                            "AI Vision: ${aiOutput.status.name}"
                         } else {
-                            "AI Vision: MODEL_UNAVAILABLE (Saved Locally to Room)"
+                            "AI Vision: MODEL_UNAVAILABLE"
                         }
 
-                        onQrScanned(sampleTag, aiResultSummary)
+                        onQrScanned(manualTagInput.trim(), aiResultSummary)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C3A)),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Capture Frame & Save to Room DB", fontWeight = FontWeight.Bold)
+                    Text("Capture Evidence & Save to Queue", fontWeight = FontWeight.Bold)
                 }
             }
         },
@@ -1394,13 +1418,7 @@ fun RoleDashboardScreen(
         LiveCameraScannerModal(
             onQrScanned = { tagCode, aiResult ->
                 showCameraModal = false
-                if (role == UserRoleType.COLLECTOR) {
-                    walletBalance += 2.0
-                    actionMessage = "Scanned Tag $tagCode • $aiResult • Tag Status set to CLOSED (+₹2.00)"
-                } else {
-                    walletBalance += 10
-                    actionMessage = "Scanned Tag $tagCode • $aiResult • +10 Eco-Points added to Household Wallet!"
-                }
+                actionMessage = "Scanned Tag $tagCode • $aiResult • Saved to Room DB (Pending Network Sync)"
             },
             onClose = { showCameraModal = false }
         )
