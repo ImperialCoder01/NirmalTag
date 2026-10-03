@@ -39,17 +39,18 @@ export default function HomePage() {
               NirmalTag empowers households and municipal authorities with tamper-evident single-use QR tags, on-device AI visual evidence verification, and double-entry reward ledgers.
             </p>            <div className="flex flex-wrap gap-4 pt-2">
               <Link
-                href="/tag-officer"
+                href="/household"
                 className="px-6 py-3 rounded-xl bg-white text-emerald-900 font-bold text-sm shadow-md hover:bg-emerald-50 transition-colors flex items-center gap-2"
               >
-                <span>Launch Tag Officer Hub</span>
+                <span>Household Resident</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
-                href="/mcd"
-                className="px-6 py-3 rounded-xl bg-emerald-800/80 hover:bg-emerald-800 text-white font-semibold text-sm border border-emerald-500/30 backdrop-blur-md transition-colors"
+                href="/collector"
+                className="px-6 py-3 rounded-xl bg-emerald-800/80 hover:bg-emerald-800 text-white font-semibold text-sm border border-emerald-500/30 backdrop-blur-md transition-colors flex items-center gap-2"
               >
-                View MCD Dashboard
+                <span>Field Waste Collector</span>
+                <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>
