@@ -80,16 +80,16 @@ class PickupSyncWorker(
         }
     }
 
-    private suspend fun simulateOrExecuteSync(pickup: PendingPickupEntity): Result<String> {
+    private suspend fun simulateOrExecuteSync(pickup: PendingPickupEntity): kotlin.Result<String> {
         // Enforces client evidence sync contract with backend process_verified_pickup_transaction_v2
         // All authorization and state Machine checks are enforced server-side.
         if (pickup.tagSerialCode.startsWith("NT-INVALID")) {
-            return Result.failure(Exception("TAG_INVALID_STATE: Tag not in ATTACHED/ISSUED status"))
+            return kotlin.Result.failure(Exception("TAG_INVALID_STATE: Tag not in ATTACHED/ISSUED status"))
         }
 
         // Simulating network RPC call to Supabase / Backend endpoint
         kotlinx.coroutines.delay(1000)
-        return Result.success("SUPABASE-TXN-2026-${(10000..99999).random()}")
+        return kotlin.Result.success("SUPABASE-TXN-2026-${(10000..99999).random()}")
     }
 
     companion object {
@@ -105,7 +105,7 @@ class PickupSyncWorker(
                 .setConstraints(constraints)
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
-                    OneTimeWorkRequest.MIN_BACKOFF_MILLIS,
+                    WorkRequest.MIN_BACKOFF_MILLIS,
                     TimeUnit.MILLISECONDS
                 )
                 .build()
