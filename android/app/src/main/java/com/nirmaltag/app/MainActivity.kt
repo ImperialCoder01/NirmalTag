@@ -41,7 +41,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.nirmaltag.app.ai.VerificationResultStatus
+import com.nirmaltag.app.ai.VisualVerificationEngine
+import com.nirmaltag.app.data.local.NirmalTagDatabase
+import com.nirmaltag.app.data.local.OfflinePickupState
+import com.nirmaltag.app.data.local.PendingPickupEntity
+import com.nirmaltag.app.sync.PickupSyncWorker
 import com.nirmaltag.app.ui.theme.NirmalTagTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.io.File
+import java.security.MessageDigest
+import java.util.UUID
 
 enum class UserRoleType(val label: String, val portalName: String, val routePath: String) {
     HOUSEHOLD("Household Resident", "Household Portal", "/household"),
@@ -768,6 +779,8 @@ fun LiveCameraScannerModal(
         }
     }
 
+    val coroutineScope = rememberCoroutineScope()
+
     AlertDialog(
         onDismissRequest = onClose,
         title = {
@@ -851,14 +864,59 @@ fun LiveCameraScannerModal(
                     onClick = {
                         isSimulatingFrame = true
                         val sampleTag = "NT-SAN-2026-${(8000..8999).random()}"
-                        val aiResult = "MobileNetV3 AI: SANITARY POUCH VERIFIED (98.4% Confidence)"
-                        onQrScanned(sampleTag, aiResult)
+                        
+                        // 1. Evaluate VisualVerificationEngine
+                        val aiEngine = VisualVerificationEngine(context)
+                        val dummyBitmap = android.graphics.Bitmap.createBitmap(224, 224, android.graphics.Bitmap.Config.ARGB_8888)
+                        val aiOutput = aiEngine.evaluateEvidenceImage(dummyBitmap)
+
+                        // 2. Persist Evidence File to disk
+                        val fileDir = File(context.filesDir, "pickups").apply { mkdirs() }
+                        val localFile = File(fileDir, "photo_${System.currentTimeMillis()}.jpg")
+                        localFile.writeBytes(ByteArray(1024)) // Evidence file placeholder
+
+                        // 3. Compute SHA256 Evidence Hash
+                        val sha256 = MessageDigest.getInstance("SHA-256").digest(localFile.readBytes())
+                            .joinToString("") { "%02x".format(it) }
+
+                        // 4. Construct Room Database Entity
+                        val localPickupId = UUID.randomUUID().toString()
+                        val entity = PendingPickupEntity(
+                            localPickupId = localPickupId,
+                            idempotencyKey = UUID.randomUUID().toString(),
+                            tagSerialCode = sampleTag,
+                            collectorId = "usr_collector_field_01",
+                            photoLocalUri = localFile.absolutePath,
+                            photoSha256 = sha256,
+                            gpsLatitude = 28.5355,
+                            gpsLongitude = 77.2610,
+                            gpsAccuracyMeters = 4.5f,
+                            capturedAtEpochMs = System.currentTimeMillis(),
+                            aiStatus = aiOutput.status.name,
+                            aiConfidence = aiOutput.confidence,
+                            aiInferenceMs = aiOutput.inferenceTimeMs,
+                            state = OfflinePickupState.LOCAL_CAPTURED
+                        )
+
+                        // 5. Insert to Room & Schedule Background WorkManager Sync
+                        coroutineScope.launch(Dispatchers.IO) {
+                            NirmalTagDatabase.getDatabase(context).pickupDao().insertPickup(entity)
+                            PickupSyncWorker.scheduleSync(context)
+                        }
+
+                        val aiResultSummary = if (aiOutput.isModelAvailable) {
+                            "AI Vision: ${aiOutput.status.name} (${String.format("%.1f", aiOutput.confidence * 100)}% Conf)"
+                        } else {
+                            "AI Vision: MODEL_UNAVAILABLE (Saved Locally to Room)"
+                        }
+
+                        onQrScanned(sampleTag, aiResultSummary)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C3A)),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Capture Frame & Run AI Scan", fontWeight = FontWeight.Bold)
+                    Text("Capture Frame & Save to Room DB", fontWeight = FontWeight.Bold)
                 }
             }
         },
@@ -882,6 +940,10 @@ fun RoleDashboardScreen(
     onSignOut: () -> Unit
 ) {
     val context = LocalContext.current
+    val db = remember { NirmalTagDatabase.getDatabase(context) }
+    val pendingCountState = db.pickupDao().getPendingCountFlow().collectAsState(initial = 0)
+    val pendingCount = pendingCountState.value
+
     var walletBalance by remember { mutableStateOf(if (role == UserRoleType.COLLECTOR) 48.0 else 140.0) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var activeModalType by remember { mutableStateOf<String?>(null) }
@@ -1089,14 +1151,18 @@ fun RoleDashboardScreen(
 
                             Button(
                                 onClick = {
-                                    walletBalance += 6.0
-                                    actionMessage = "Synced 3 queued offline pickups to server. Wallet updated to ₹${String.format("%.2f", walletBalance)}"
+                                    PickupSyncWorker.scheduleSync(context)
+                                    actionMessage = if (pendingCount > 0) {
+                                        "Triggered WorkManager sync for $pendingCount queued offline pickup(s)."
+                                    } else {
+                                        "WorkManager sync triggered. Room database queue is up to date (0 pending)."
+                                    }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Sync Offline Pickup Queue (3 Pending)")
+                                Text("Sync Offline Pickup Queue ($pendingCount Pending)")
                             }
 
                             OutlinedButton(
