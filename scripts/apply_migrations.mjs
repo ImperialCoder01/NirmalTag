@@ -36,15 +36,19 @@ async function applyMigration(fileName) {
 }
 
 async function run() {
-  const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
-  for (const file of files) {
+  const targetFiles = [
+    '20261003000004_iteration1_5_security_and_policies.sql',
+    '20261003000005_iteration1_6_security_hardening.sql'
+  ];
+
+  for (const file of targetFiles) {
     const success = await applyMigration(file);
     if (!success) {
       console.error(`Stopping migration run due to error in ${file}`);
       process.exit(1);
     }
   }
-  console.log('All Supabase database migrations applied successfully!');
+  console.log('Target database security migrations 0004 and 0005 applied successfully!');
 }
 
 run();
