@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized access: Bearer token required" }, { status: 401 });
+      return NextResponse.json({
+        success: false,
+        code: "UNAUTHORIZED",
+        message: "Pickup processing failed: Missing or invalid Authorization header.",
+      }, { status: 401 });
     }
 
     const idToken = authHeader.split("Bearer ")[1];
@@ -18,57 +22,61 @@ export async function POST(request: Request) {
 
     const firebaseData = await firebaseRes.json();
     if (!firebaseRes.ok || !firebaseData.users || firebaseData.users.length === 0) {
-      return NextResponse.json({ error: "Invalid Firebase identity token" }, { status: 401 });
+      return NextResponse.json({
+        success: false,
+        code: "INVALID_TOKEN",
+        message: "Pickup processing failed: Invalid or expired Firebase identity token.",
+      }, { status: 401 });
     }
 
     const firebaseUser = firebaseData.users[0];
     const collectorUid = firebaseUser.localId;
 
     const body = await request.json();
-    const { pickupId, tagId, tagSerial, idempotencyKey, aiResult } = body;
+    const { pickupId, tagId, idempotencyKey } = body;
 
-    if (!tagSerial && !tagId) {
-      return NextResponse.json({ error: "Tag serial code or Tag ID required" }, { status: 400 });
+    if (!pickupId || !tagId) {
+      return NextResponse.json({
+        success: false,
+        code: "INVALID_PARAMETERS",
+        message: "Pickup processing failed: pickupId and tagId are required parameters.",
+      }, { status: 400 });
     }
 
-    const activeIdempotencyKey = idempotencyKey || `SYNC-${tagSerial || tagId}-${Date.now()}`;
+    const activeIdempotencyKey = idempotencyKey || `SYNC-${pickupId}-${tagId}`;
 
-    // Execute PostgreSQL transaction function: process_verified_pickup_transaction
-    const { data: dbResult, error: dbError } = await supabase.rpc(
-      "process_verified_pickup_transaction",
+    // Execute PostgreSQL transaction RPC: process_verified_pickup_transaction_v2
+    // NO CLIENT-SUPPLIED REWARD AMOUNTS OR HOUSEHOLD IDS TRUSTED!
+    const { data: dbResult, error: dbError } = await supabaseAdmin.rpc(
+      "process_verified_pickup_transaction_v2",
       {
-        p_pickup_id: pickupId || "123e4567-e89b-12d3-a456-426614174000",
-        p_tag_id: tagId || "876e5432-e89b-12d3-a456-426614174000",
+        p_pickup_id: pickupId,
+        p_tag_id: tagId,
         p_collector_profile_id: collectorUid,
-        p_household_profile_id: collectorUid,
-        p_credit_amount: 10.0,
-        p_incentive_amount: 2.0,
         p_idempotency_key: activeIdempotencyKey,
       }
     );
 
+    // CATASTROPHIC FALLBACK REMOVED: Database failure MUST NEVER produce fake success!
     if (dbError) {
-      // Fallback response with verified status if RPC executes with default values
       return NextResponse.json({
-        success: true,
-        pickupStatus: "VERIFIED",
-        tagStatus: "CLOSED",
-        aiVerification: aiResult || { status: "VERIFIED", confidence: 0.984, category: "Sanitary Waste Pouch" },
-        householdCredit: "+10 Eco-Points",
-        collectorIncentive: "+₹2.00",
-        idempotencyKey: activeIdempotencyKey,
-        databaseNote: "Processed via production backend gateway.",
-      });
+        success: false,
+        code: "PICKUP_PROCESSING_FAILED",
+        message: `Pickup could not be finalized. No reward was posted: ${dbError.message}`,
+      }, { status: 422 });
     }
 
     return NextResponse.json({
       success: true,
-      pickupStatus: "VERIFIED",
-      tagStatus: "CLOSED",
+      code: "PICKUP_FINALIZED",
       result: dbResult,
       idempotencyKey: activeIdempotencyKey,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Pickup sync failed" }, { status: 500 });
+    return NextResponse.json({
+      success: false,
+      code: "SERVER_ERROR",
+      message: error.message || "Pickup processing failed due to server error.",
+    }, { status: 500 });
   }
 }

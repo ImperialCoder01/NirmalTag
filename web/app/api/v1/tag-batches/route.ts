@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized access: Bearer token required" }, { status: 401 });
+      return NextResponse.json({
+        success: false,
+        code: "UNAUTHORIZED",
+        message: "Tag batch creation failed: Missing or invalid Authorization header.",
+      }, { status: 401 });
     }
 
     const idToken = authHeader.split("Bearer ")[1];
@@ -18,7 +22,11 @@ export async function POST(request: Request) {
 
     const firebaseData = await firebaseRes.json();
     if (!firebaseRes.ok || !firebaseData.users || firebaseData.users.length === 0) {
-      return NextResponse.json({ error: "Invalid Firebase identity token" }, { status: 401 });
+      return NextResponse.json({
+        success: false,
+        code: "INVALID_TOKEN",
+        message: "Tag batch creation failed: Invalid or expired Firebase identity token.",
+      }, { status: 401 });
     }
 
     const firebaseUser = firebaseData.users[0];
@@ -27,35 +35,42 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { batchName, quantity, wardId, idempotencyKey } = body;
 
-    const qty = quantity || 1000;
+    const qty = quantity || 100;
     const name = batchName || `BATCH-2026-${Math.floor(100 + Math.random() * 900)}`;
-    const startSerial = `NT-SAN-2026-${Math.floor(1000 + Math.random() * 8000)}`;
-    const endSerial = `NT-SAN-2026-${parseInt(startSerial.split("-")[3]) + qty - 1}`;
-
     const activeIdempotencyKey = idempotencyKey || `BATCH-GEN-${name}-${Date.now()}`;
 
-    // Record Audit Log Entry in Supabase
-    await supabase.from("audit_logs").insert({
-      actor_id: officerUid,
-      role: "TAG_OFFICER",
-      action: "TAG_BATCH_CREATED",
-      target_entity: "tag_batches",
-      target_id: name,
-      idempotency_key: activeIdempotencyKey,
-      metadata: { quantity: qty, startSerial, endSerial, wardId: wardId || "ward-42" },
-    });
+    // Execute PostgreSQL procedure: create_tag_batch_and_records
+    // Generates actual tag_batch and N actual tag records in PostgreSQL DB!
+    const { data: dbResult, error: dbError } = await supabaseAdmin.rpc(
+      "create_tag_batch_and_records",
+      {
+        p_batch_name: name,
+        p_quantity: qty,
+        p_ward_id: wardId || "123e4567-e89b-12d3-a456-426614174000",
+        p_officer_profile_id: officerUid,
+        p_idempotency_key: activeIdempotencyKey,
+      }
+    );
+
+    if (dbError) {
+      return NextResponse.json({
+        success: false,
+        code: "BATCH_CREATION_FAILED",
+        message: `Tag batch creation failed: ${dbError.message}`,
+      }, { status: 422 });
+    }
 
     return NextResponse.json({
       success: true,
-      batchName: name,
-      quantity: qty,
-      startSerial,
-      endSerial,
-      status: "IN_INVENTORY",
+      code: "BATCH_CREATED",
+      result: dbResult,
       idempotencyKey: activeIdempotencyKey,
-      created_at: new Date().toISOString(),
     }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Batch creation failed" }, { status: 500 });
+    return NextResponse.json({
+      success: false,
+      code: "SERVER_ERROR",
+      message: error.message || "Tag batch creation failed due to server error.",
+    }, { status: 500 });
   }
 }
