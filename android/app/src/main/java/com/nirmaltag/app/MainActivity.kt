@@ -1,3 +1,4 @@
+@file:OptIn(androidx.camera.core.ExperimentalGetImage::class)
 package com.nirmaltag.app
 
 import android.Manifest
@@ -12,9 +13,18 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.camera.core.ExperimentalGetImage
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -870,6 +880,10 @@ fun LiveCameraScannerModal(
             }
         },
         text = {
+            var manualTagInput by remember { mutableStateOf("") }
+            var isAutoDetected by remember { mutableStateOf(false) }
+            var tagError by remember { mutableStateOf<String?>(null) }
+
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -893,14 +907,73 @@ fun LiveCameraScannerModal(
                                         val cameraProvider = cameraProviderFuture.get()
                                         val preview = Preview.Builder().build()
                                         preview.setSurfaceProvider(previewView.surfaceProvider)
+
+                                        val barcodeScanner = BarcodeScanning.getClient()
+                                        val isProcessingFrame = AtomicBoolean(false)
+
+                                        val imageAnalysis = ImageAnalysis.Builder()
+                                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                            .build()
+
+                                        val analyzerExecutor = Executors.newSingleThreadExecutor()
+
+                                        imageAnalysis.setAnalyzer(analyzerExecutor) { imageProxy ->
+                                            val mediaImage = imageProxy.image
+                                            if (mediaImage != null && !isProcessingFrame.get()) {
+                                                isProcessingFrame.set(true)
+                                                Log.d("CollectorScanner", "QR_SCAN_FRAME_RECEIVED timestamp=${imageProxy.imageInfo.timestamp}")
+
+                                                val inputImage = InputImage.fromMediaImage(
+                                                    mediaImage,
+                                                    imageProxy.imageInfo.rotationDegrees
+                                                )
+
+                                                barcodeScanner.process(inputImage)
+                                                    .addOnSuccessListener { barcodes ->
+                                                        Log.d("CollectorScanner", "QR_SCAN_BARCODE_COUNT=${barcodes.size}")
+                                                        for (barcode in barcodes) {
+                                                            val rawValue = barcode.rawValue
+                                                            if (!rawValue.isNullOrEmpty()) {
+                                                                Log.d("CollectorScanner", "QR_SCAN_RAW_VALUE=$rawValue")
+                                                                Log.d("CollectorScanner", "QR_SCAN_SUCCESS=true")
+
+                                                                if (TagValidationUtil.isValidTagSerial(rawValue)) {
+                                                                    ContextCompat.getMainExecutor(ctx).execute {
+                                                                        manualTagInput = rawValue.trim()
+                                                                        isAutoDetected = true
+                                                                        tagError = null
+                                                                    }
+                                                                } else {
+                                                                    Log.w("CollectorScanner", "QR_SCAN_INVALID_FORMAT=$rawValue")
+                                                                }
+                                                                break
+                                                            }
+                                                        }
+                                                    }
+                                                    .addOnFailureListener { e ->
+                                                        Log.e("CollectorScanner", "QR_SCAN_ERROR=${e.localizedMessage}", e)
+                                                        Log.d("CollectorScanner", "QR_SCAN_SUCCESS=false")
+                                                    }
+                                                    .addOnCompleteListener {
+                                                        isProcessingFrame.set(false)
+                                                        imageProxy.close()
+                                                    }
+                                            } else {
+                                                imageProxy.close()
+                                            }
+                                        }
+
                                         val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                                         cameraProvider.unbindAll()
                                         cameraProvider.bindToLifecycle(
                                             lifecycleOwner,
                                             cameraSelector,
-                                            preview
+                                            preview,
+                                            imageAnalysis
                                         )
-                                    } catch (_: Exception) {}
+                                    } catch (e: Exception) {
+                                        Log.e("CollectorScanner", "CameraX setup exception: ${e.localizedMessage}", e)
+                                    }
                                 }, ContextCompat.getMainExecutor(ctx))
                                 previewView
                             },
@@ -932,7 +1005,7 @@ fun LiveCameraScannerModal(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Camera permission required for live scanning. Using camera view simulation.",
+                            text = "Camera permission required for live scanning.",
                             color = Color(0xFF991B1B),
                             fontSize = 11.sp,
                             modifier = Modifier.padding(12.dp)
@@ -940,16 +1013,36 @@ fun LiveCameraScannerModal(
                     }
                 }
 
-                var manualTagInput by remember { mutableStateOf("NT-SAN-2026-8012") }
-                var tagError by remember { mutableStateOf<String?>(null) }
+                if (isAutoDetected) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFECFDF5)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF059669), modifier = Modifier.size(16.dp))
+                            Text(
+                                text = "✓ QR Code Optically Scanned & Decoded via CameraX ML Kit",
+                                color = Color(0xFF065F46),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = manualTagInput,
                     onValueChange = {
                         manualTagInput = it
+                        isAutoDetected = false
                         tagError = null
                     },
-                    label = { Text("Scanned / Entered Tag Serial Code") },
+                    label = { Text(if (isAutoDetected) "Scanned Tag Serial Code (Auto-Detected)" else "Scanned / Entered Tag Serial Code") },
                     isError = tagError != null,
                     supportingText = tagError?.let { { Text(it, color = Color(0xFFDC2626)) } },
                     modifier = Modifier.fillMaxWidth(),
