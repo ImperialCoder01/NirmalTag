@@ -1,7 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 
-const url = "https://ubphrqumpqdifupwbvpe.supabase.co";
-const key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVicGhycXVtcHFkaWZ1cHdidnBlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMjUwNzYsImV4cCI6MjEwNjYwMTA3Nn0.gYl7pOeKSc_8YxTnDczFgPkcLaA3qMIH7DEggpulH7U";
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ubphrqumpqdifupwbvpe.supabase.co";
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+if (!key) {
+  console.log("NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable required.");
+  process.exit(1);
+}
 
 const supabase = createClient(url, key);
 
@@ -58,7 +63,7 @@ async function checkBaseline() {
   console.log("=== FUNCTION EXISTENCE CHECKS ===");
 
   const functions = [
-    { name: "has_role", params: { role_name: "SYSTEM_ADMIN" } },
+    { name: "has_role", params: { p_role: "SYSTEM_ADMIN" } },
     { name: "validate_tag_state_transition", params: {} },
     { name: "transition_tag_state", params: {} },
     { name: "process_verified_pickup_transaction_v2", params: {} },
