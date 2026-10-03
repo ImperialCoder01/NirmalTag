@@ -123,14 +123,6 @@ export default function Navbar() {
                 </div>
               )}
 
-              {/* Direct Link to My Active Portal */}
-              <Link
-                href={getRedirectPath(role)}
-                className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-extrabold text-emerald-900 bg-emerald-100 hover:bg-emerald-200 rounded-xl transition-colors border border-emerald-300 shadow-sm"
-              >
-                <LayoutDashboard className="w-3.5 h-3.5 text-emerald-700" />
-                <span>My Portal</span>
-              </Link>
 
               {/* User Account Menu / Badge with Click-Outside Closing */}
               <div className="relative">
