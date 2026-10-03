@@ -121,11 +121,19 @@ export default function RegisterPage() {
             onChange={(e) => handleRoleChange(e.target.value as UserRole)}
             className="w-full text-xs p-3 rounded-xl border border-slate-300 font-bold bg-white text-emerald-900 focus:ring-2 focus:ring-emerald-500 shadow-sm"
           >
-            {roleOptions.map((opt) => (
-              <option key={opt.role} value={opt.role}>
-                {opt.label}
-              </option>
-            ))}
+            <optgroup label="🌟 Most Used (Popular)">
+              <option value="HOUSEHOLD">Household Resident</option>
+              <option value="COLLECTOR">Field Waste Collector</option>
+            </optgroup>
+            <optgroup label="🏢 Residential & Commercial">
+              <option value="RWA_ADMIN">RWA / Society Administrator</option>
+              <option value="BWG_ADMIN">Commercial Bulk Waste Generator (BWG)</option>
+            </optgroup>
+            <optgroup label="🛡️ Municipal & System Admin">
+              <option value="TAG_OFFICER">Tag Officer (Inventory)</option>
+              <option value="MCD_OFFICER">MCD Municipal Officer</option>
+              <option value="SYSTEM_ADMIN">System Administrator</option>
+            </optgroup>
           </select>
           <div className="mt-1 flex items-start gap-1 text-[10px] text-slate-500">
             <Info className="w-3 h-3 text-slate-400 flex-shrink-0 mt-0.5" />

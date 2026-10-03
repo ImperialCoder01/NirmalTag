@@ -418,7 +418,80 @@ fun UserTypeAuthScreen(
                             .fillMaxWidth(0.9f)
                             .background(Color.White)
                     ) {
-                        UserRoleType.values().forEach { roleOption ->
+                        Text(
+                            text = "MOST USED (POPULAR)",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF0D5C3A),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                        listOf(UserRoleType.HOUSEHOLD, UserRoleType.COLLECTOR).forEach { roleOption ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = roleOption.label,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = if (roleOption == selectedRole) Color(0xFF0D5C3A) else Color(0xFF0F172A)
+                                        )
+                                        Text(
+                                            text = roleOption.portalName,
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF64748B)
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    onRoleSelected(roleOption)
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+
+                        HorizontalDivider(color = Color(0xFFE2E8F0))
+
+                        Text(
+                            text = "RESIDENTIAL & COMMERCIAL",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF0369A1),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                        listOf(UserRoleType.RWA_ADMIN, UserRoleType.BWG_ADMIN).forEach { roleOption ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = roleOption.label,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = if (roleOption == selectedRole) Color(0xFF0D5C3A) else Color(0xFF0F172A)
+                                        )
+                                        Text(
+                                            text = roleOption.portalName,
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF64748B)
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    onRoleSelected(roleOption)
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+
+                        HorizontalDivider(color = Color(0xFFE2E8F0))
+
+                        Text(
+                            text = "MUNICIPAL & SYSTEM ADMIN",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                        listOf(UserRoleType.TAG_OFFICER, UserRoleType.MCD_OFFICER, UserRoleType.SYSTEM_ADMIN).forEach { roleOption ->
                             DropdownMenuItem(
                                 text = {
                                     Column {
