@@ -5,20 +5,35 @@ import Image from "next/image";
 import Link from "next/link";
 import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
-import { ShieldCheck, UserPlus, Mail, Lock, User, AlertCircle, Info, ExternalLink } from "lucide-react";
+import { useAuth, UserRole, getRedirectPath } from "@/lib/auth-context";
+import { ShieldCheck, UserPlus, Mail, Lock, User, AlertCircle, Info, UserCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
+  const { role, setRole } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [selectedRole, setSelectedRole] = useState<"HOUSEHOLD" | "COLLECTOR">("HOUSEHOLD");
   const [hasAgreedConsent, setHasAgreedConsent] = useState(true);
   const [error, setError] = useState("");
   const [firebaseSetupError, setFirebaseSetupError] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  const roleOptions: { role: UserRole; label: string; path: string }[] = [
+    { role: "HOUSEHOLD", label: "Household Resident", path: "/household" },
+    { role: "COLLECTOR", label: "Field Waste Collector", path: "/collector" },
+    { role: "TAG_OFFICER", label: "Tag Officer (Inventory)", path: "/tag-officer" },
+    { role: "RWA_ADMIN", label: "RWA Administrator", path: "/rwa" },
+    { role: "BWG_ADMIN", label: "BWG Administrator", path: "/bwg" },
+    { role: "MCD_OFFICER", label: "MCD Municipal Officer", path: "/mcd" },
+    { role: "SYSTEM_ADMIN", label: "System Administrator", path: "/admin" },
+  ];
+
+  const handleRoleChange = (newRole: UserRole) => {
+    setRole(newRole);
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +56,8 @@ export default function RegisterPage() {
       if (userCredential.user) {
         await updateProfile(userCredential.user, { displayName: fullName });
       }
-      router.push(selectedRole === "COLLECTOR" ? "/collector" : "/household");
+      const targetPath = getRedirectPath(role);
+      router.push(targetPath);
     } catch (err: any) {
       if (err.code === "auth/configuration-not-found" || err.message?.includes("configuration-not-found") || err.code === "auth/unauthorized-domain") {
         setFirebaseSetupError(true);
@@ -66,7 +82,8 @@ export default function RegisterPage() {
 
     try {
       await signInWithPopup(auth, googleProvider);
-      router.push(selectedRole === "COLLECTOR" ? "/collector" : "/household");
+      const targetPath = getRedirectPath(role);
+      router.push(targetPath);
     } catch (err: any) {
       if (err.code === "auth/configuration-not-found" || err.message?.includes("configuration-not-found") || err.code === "auth/unauthorized-domain") {
         setFirebaseSetupError(true);
@@ -88,7 +105,31 @@ export default function RegisterPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Create NirmalTag Account</h1>
-            <p className="text-xs text-slate-500">Register as a Household Resident or Field Collector</p>
+            <p className="text-xs text-slate-500">Select your User Type & register your account</p>
+          </div>
+        </div>
+
+        {/* 1. SELECT USER TYPE BEFORE REGISTER */}
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+          <label className="block text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5" htmlFor="reg-role-select">
+            <UserCheck className="w-4 h-4 text-emerald-600" />
+            <span>Step 1: Select Your User Type</span>
+          </label>
+          <select
+            id="reg-role-select"
+            value={role}
+            onChange={(e) => handleRoleChange(e.target.value as UserRole)}
+            className="w-full text-xs p-3 rounded-xl border border-slate-300 font-bold bg-white text-emerald-900 focus:ring-2 focus:ring-emerald-500 shadow-sm"
+          >
+            {roleOptions.map((opt) => (
+              <option key={opt.role} value={opt.role}>
+                {opt.label} ({opt.path})
+              </option>
+            ))}
+          </select>
+          <div className="mt-1 flex items-start gap-1 text-[10px] text-slate-500">
+            <Info className="w-3 h-3 text-slate-400 flex-shrink-0 mt-0.5" />
+            <span>Privileged roles (Tag Officer, RWA, MCD, System Admin) require audited administrative provisioning.</span>
           </div>
         </div>
 
@@ -124,7 +165,7 @@ export default function RegisterPage() {
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
           </svg>
-          <span>{loading ? "Signing up..." : "Sign Up with Google"}</span>
+          <span>Sign Up as {role.replace("_", " ")} with Google</span>
         </button>
 
         <div className="relative my-4">
@@ -164,24 +205,6 @@ export default function RegisterPage() {
                 placeholder="name@nirmaltag.org"
                 className="pl-9 w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-slate-900"
               />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="account-type-select">Account Type</label>
-            <select
-              id="account-type-select"
-              value={selectedRole}
-              aria-label="Account Type Selection"
-              onChange={(e) => setSelectedRole(e.target.value as "HOUSEHOLD" | "COLLECTOR")}
-              className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-slate-900"
-            >
-              <option value="HOUSEHOLD">Household Resident (Waste Segregation)</option>
-              <option value="COLLECTOR">Field Waste Collector (Scanner App)</option>
-            </select>
-            <div className="mt-1 flex items-start gap-1 text-[10px] text-slate-500">
-              <Info className="w-3 h-3 text-slate-400 flex-shrink-0 mt-0.5" />
-              <span>Privileged roles (Tag Officer, RWA, MCD, System Admin) require audited administrative provisioning.</span>
             </div>
           </div>
 
@@ -248,11 +271,11 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            aria-label="Create Account with Email"
+            aria-label="Create Account"
             className="w-full py-3 brand-gradient text-white font-bold text-xs rounded-xl shadow-md hover:opacity-95 transition-opacity flex items-center justify-center gap-2"
           >
             <UserPlus className="w-4 h-4" />
-            <span>{loading ? "Creating Account..." : "Create Account with Email"}</span>
+            <span>{loading ? "Creating Account..." : `Create Account as ${role.replace("_", " ")}`}</span>
           </button>
         </form>
 

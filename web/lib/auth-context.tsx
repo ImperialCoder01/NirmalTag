@@ -20,6 +20,7 @@ interface AuthContextType {
   loading: boolean;
   setRole: (role: UserRole) => void;
   signOut: () => Promise<void>;
+  getRedirectPath: (role: UserRole) => string;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -28,19 +29,39 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   setRole: () => {},
   signOut: async () => {},
+  getRedirectPath: () => "/household",
 });
+
+export const getRedirectPath = (role: UserRole): string => {
+  switch (role) {
+    case "COLLECTOR": return "/collector";
+    case "TAG_OFFICER": return "/tag-officer";
+    case "RWA_ADMIN": return "/rwa";
+    case "BWG_ADMIN": return "/bwg";
+    case "MCD_OFFICER": return "/mcd";
+    case "SYSTEM_ADMIN": return "/admin";
+    case "HOUSEHOLD":
+    default:
+      return "/household";
+  }
+};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<UserRole>("HOUSEHOLD");
+  const [role, setRoleState] = useState<UserRole>("HOUSEHOLD");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Restore selected role from local storage if set
+    const savedRole = localStorage.getItem("nirmaltag_user_role") as UserRole;
+    if (savedRole) {
+      setRoleState(savedRole);
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
 
       if (currentUser) {
-        // Sync user profile authoritatively with Supabase PostgreSQL
         try {
           const { data: existingProfile } = await supabase
             .from("profiles")
@@ -49,32 +70,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             .single();
 
           if (!existingProfile) {
-            // Upsert profile in PostgreSQL
             await supabase.from("profiles").upsert({
               id: currentUser.uid,
               firebase_uid: currentUser.uid,
               email: currentUser.email || "",
-              full_name: currentUser.displayName || currentUser.email?.split("@")[0] || "NirmalTag Resident",
-              phone_number: currentUser.phoneNumber || null,
+              full_name: currentUser.displayName || currentUser.email?.split("@")[0] || "NirmalTag User",
               is_active: true
             });
-
-            // Fetch HOUSEHOLD role ID
-            const { data: roleData } = await supabase
-              .from("roles")
-              .select("id")
-              .eq("name", "HOUSEHOLD")
-              .single();
-
-            if (roleData) {
-              await supabase.from("user_roles").upsert({
-                user_id: currentUser.uid,
-                role_id: roleData.id
-              });
-            }
           }
         } catch (err) {
-          console.error("Supabase profile sync error:", err);
+          console.error("Supabase profile sync:", err);
         }
       }
 
@@ -84,13 +89,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
+  const setRole = (newRole: UserRole) => {
+    setRoleState(newRole);
+    localStorage.setItem("nirmaltag_user_role", newRole);
+  };
+
   const handleSignOut = async () => {
     await firebaseSignOut(auth);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, setRole, signOut: handleSignOut }}>
+    <AuthContext.Provider value={{ user, role, loading, setRole, signOut: handleSignOut, getRedirectPath }}>
       {children}
     </AuthContext.Provider>
   );
