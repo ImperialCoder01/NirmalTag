@@ -27,7 +27,16 @@ BEGIN
         RAISE EXCEPTION 'Access Denied: Unauthenticated caller.' USING ERRCODE = '42501';
     END IF;
 
-    SELECT role INTO v_actor_role FROM user_roles WHERE user_id = v_actor_profile_id LIMIT 1;
+    SELECT r.name INTO v_actor_role
+    FROM user_roles ur
+    JOIN roles r ON ur.role_id = r.id
+    WHERE ur.user_id = v_actor_profile_id
+    LIMIT 1;
+
+    IF v_actor_role IS NULL THEN
+        SELECT role::text INTO v_actor_role FROM profiles WHERE id = v_actor_profile_id;
+    END IF;
+
     IF v_actor_role NOT IN ('COLLECTOR', 'TAG_OFFICER', 'RWA_ADMIN', 'SYSTEM_ADMIN') THEN
         RAISE EXCEPTION 'Access Denied: Role % is not authorized to fulfill pouch orders.', COALESCE(v_actor_role, 'UNKNOWN') USING ERRCODE = '42501';
     END IF;

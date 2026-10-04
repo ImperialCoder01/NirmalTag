@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Testing & Verification**: 54/54 web integration test suite, 54/54 android unit test suite, 39 prerendered Next.js web routes compiled cleanly.
 
 ### Fixed
+- **Household Pouch Request RPC Contract**: Applied unapplied migrations `20261004200000_iteration19_full_operational_loop.sql` and `20261004210000_iteration25_pouch_fulfillment_rpc.sql` to live production Supabase database (`ubphrqumpqdifupwbvpe`). Resolved PostgREST `PGRST202` schema cache error and fixed `user_roles` query syntax in `fulfill_household_pouch_request` RPC procedure.
 - **PostgreSQL Error Codes**: Replaced hardcoded `ERRCODE = '42P01'` statements in database procedures with standard semantic codes (`22023` parameter invalid, `22000` business rule error, `42501` auth denial).
 - **Google Session Reset**: Resolved Google Sign-In session caching bug by invoking `signOut()` prior to launching native account chooser.
 
