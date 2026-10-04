@@ -4,11 +4,11 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { QrScanner } from "@/components/qr-scanner";
 import { 
   QrCode, Camera, CheckCircle2, RefreshCw, 
-  Wifi, WifiOff, Wallet, ShieldAlert, UploadCloud, Lock
+  Wifi, WifiOff, Wallet, ShieldAlert, UploadCloud, Lock, AlertCircle
 } from "lucide-react";
-
 
 export default function CollectorPage() {
   const { user, role, getIdToken } = useAuth();
@@ -17,9 +17,11 @@ export default function CollectorPage() {
   const [scannedCode, setScannedCode] = useState<string>("");
   const [manualInputCode, setManualInputCode] = useState<string>("");
   const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
   const [scanState, setScanState] = useState<"IDLE" | "SCANNING" | "VALIDATED" | "SUBMITTED" | "ERROR">("IDLE");
   const [scannedTagId, setScannedTagId] = useState<string>("");
   const [scannedTagStatus, setScannedTagStatus] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const [aiResult, setAiResult] = useState<{ status: string; confidence: number; category: string } | null>(null);
 
   // Financial Wallet State
@@ -116,6 +118,16 @@ export default function CollectorPage() {
   const executeScan = async (codeToScan: string) => {
     setScanState("SCANNING");
     setScannedCode(codeToScan);
+    setErrorMessage("");
+
+    // QR Format Regular Expression Validation
+    const qrRegex = /^(NT|NMT)(-(SAN|HAZ|REC))?-[0-9]{4}-[0-9]{4,8}$/i;
+    if (!qrRegex.test(codeToScan)) {
+      setErrorMessage(`Invalid QR format: "${codeToScan}" is not a recognized NirmalTag serial format.`);
+      showNotification(`Invalid QR format: "${codeToScan}"`, "error");
+      setScanState("ERROR");
+      return;
+    }
 
     try {
       const token = await getIdToken();
@@ -138,6 +150,14 @@ export default function CollectorPage() {
       if (res.ok && data.success && data.tag) {
         setScannedTagId(data.tag.id);
         setScannedTagStatus(data.tag.status);
+
+        if (data.tag.status === "CLOSED") {
+          setErrorMessage(`Tag ${codeToScan} is already CLOSED (single-use invariant). Cannot collect again.`);
+          showNotification(`Tag ${codeToScan} is already CLOSED.`, "error");
+          setScanState("ERROR");
+          return;
+        }
+
         setAiResult({
           status: "MODEL_UNAVAILABLE",
           confidence: 0.00,
@@ -145,31 +165,15 @@ export default function CollectorPage() {
         });
         setScanState("VALIDATED");
       } else {
-        // Fallback for demonstration / local scans
-        setScannedTagId(crypto.randomUUID());
-        setScannedTagStatus("ACTIVE");
-        setAiResult({
-          status: "MODEL_UNAVAILABLE",
-          confidence: 0.00,
-          category: "Visual Verification (Pouch Sealed Invariant)"
-        });
-        setScanState("VALIDATED");
+        setErrorMessage(data.message || `Tag ${codeToScan} not found in database.`);
+        showNotification(data.message || `Tag ${codeToScan} not found.`, "error");
+        setScanState("ERROR");
       }
-    } catch (err) {
-      setScannedTagId(crypto.randomUUID());
-      setScannedTagStatus("ACTIVE");
-      setAiResult({
-        status: "MODEL_UNAVAILABLE",
-        confidence: 0.00,
-        category: "Visual Verification (Pouch Sealed Invariant)"
-      });
-      setScanState("VALIDATED");
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to query tag validation server.");
+      showNotification("Server tag lookup error.", "error");
+      setScanState("ERROR");
     }
-  };
-
-  const handleSimulateScan = () => {
-    const sampleCode = `NT-SAN-2026-917501`;
-    executeScan(sampleCode);
   };
 
   const handleManualScanSubmit = (e: React.FormEvent) => {
@@ -183,7 +187,7 @@ export default function CollectorPage() {
       // Queue offline
       const newQueueItem = {
         code: scannedCode,
-        tagId: scannedTagId || crypto.randomUUID(),
+        tagId: scannedTagId,
         timestamp: new Date().toLocaleTimeString(),
       };
       setOfflineQueue([...offlineQueue, newQueueItem]);
@@ -210,7 +214,7 @@ export default function CollectorPage() {
         },
         body: JSON.stringify({
           pickupId,
-          tagId: scannedTagId || crypto.randomUUID(),
+          tagId: scannedTagId,
           idempotencyKey,
         }),
       });
@@ -218,6 +222,7 @@ export default function CollectorPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        setErrorMessage(data.message || "Pickup verification failed.");
         showNotification(data.message || "Pickup verification failed.", "error");
         setScanState("ERROR");
         return;
@@ -227,6 +232,7 @@ export default function CollectorPage() {
       showNotification(`Pickup verified & saved! Tag ${scannedCode} set to CLOSED permanently.`);
       await fetchCollectorStats();
     } catch (err: any) {
+      setErrorMessage(err.message || "Pickup processing failed due to network error.");
       showNotification(err.message || "Pickup processing failed due to network error.", "error");
       setScanState("ERROR");
     }
@@ -284,6 +290,14 @@ export default function CollectorPage() {
         </div>
       )}
 
+      {/* Demo Environment Header Badge */}
+      <div className="p-2 bg-slate-100 border border-slate-300 rounded-xl flex items-center justify-between text-[11px] font-bold text-slate-700">
+        <span className="px-2 py-0.5 bg-amber-500 text-slate-900 rounded font-black tracking-wider uppercase text-[9px]">
+          JUDGE DEMO
+        </span>
+        <span className="text-slate-500 font-medium">Demonstration Environment</span>
+      </div>
+
       {/* Mobile Collector Header */}
       <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-lg flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -295,7 +309,7 @@ export default function CollectorPage() {
               Collector Field App ({user.displayName || user.email?.split("@")[0]})
             </h1>
             <p className="text-[11px] text-slate-400">
-              {user.email ? user.email : "Worker ID: COL-4092"} • MCD Ward 42
+              {user.email ? user.email : "Worker ID: COL-4092"} • MCD Ward JUDGE-DEMO-WARD
             </p>
           </div>
         </div>
@@ -352,106 +366,130 @@ export default function CollectorPage() {
         </div>
       )}
 
-      {/* Primary Field Scan Action Card */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6 text-center">
-        <div className="w-20 h-20 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-          <QrCode className="w-10 h-10" />
+      {/* Live Browser QR Scanner Modal */}
+      {isScannerOpen && (
+        <div className="space-y-4">
+          <QrScanner
+            onScan={(code) => {
+              setIsScannerOpen(false);
+              executeScan(code);
+            }}
+            onClose={() => setIsScannerOpen(false)}
+          />
         </div>
+      )}
 
-        {(scanState === "IDLE" || scanState === "ERROR") && (
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">Scan Pouch QR Tag</h2>
-              <p className="text-xs text-slate-500">Point camera at physical NirmalTag pouch QR code.</p>
-            </div>
-
-            <button
-              onClick={handleSimulateScan}
-              className="w-full py-4 brand-gradient text-white font-extrabold text-sm rounded-xl shadow-md hover:opacity-95 transition-opacity flex items-center justify-center gap-2"
-            >
-              <Camera className="w-5 h-5" />
-              <span>Simulate Field Camera Scan</span>
-            </button>
-
-            <div className="pt-2 text-left space-y-2 border-t border-slate-100">
-              <span className="text-[11px] font-bold text-slate-600">Or Enter Tag Serial Manually:</span>
-              <form onSubmit={handleManualScanSubmit} className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="NT-SAN-2026-917501"
-                  value={manualInputCode}
-                  onChange={(e) => setManualInputCode(e.target.value)}
-                  className="flex-1 text-xs p-2.5 rounded-xl border border-slate-300 font-mono"
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl"
-                >
-                  Verify
-                </button>
-              </form>
-            </div>
+      {/* Primary Field Scan Action Card */}
+      {!isScannerOpen && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6 text-center">
+          <div className="w-20 h-20 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <QrCode className="w-10 h-10" />
           </div>
-        )}
 
-        {scanState === "SCANNING" && (
-          <div className="py-8 space-y-3">
-            <RefreshCw className="w-8 h-8 animate-spin text-emerald-600 mx-auto" />
-            <p className="text-xs font-semibold text-slate-700">Performing visual evidence verification & verifying QR token...</p>
-          </div>
-        )}
-
-        {scanState === "VALIDATED" && (
-          <div className="space-y-5 text-left border-t border-slate-100 pt-4">
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
-              <div className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">Authoritative Tag Check</div>
-              <div className="text-xs font-mono font-bold text-slate-900">{scannedCode}</div>
-              <div className="text-[11px] text-emerald-800 font-semibold">Status: {scannedTagStatus || "ACTIVE"} • Invariant Rule: Single-Use Only</div>
-            </div>
-
-            {aiResult && (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Visual Verification Engine</div>
-                <div className="flex items-center justify-between text-xs font-bold text-slate-900">
-                  <span>Status: {aiResult.status}</span>
-                  <span className="text-slate-600">AI Model Missing</span>
-                </div>
-                <div className="text-[11px] text-slate-600">{aiResult.category}</div>
+          {(scanState === "IDLE" || scanState === "ERROR") && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Scan Pouch QR Tag</h2>
+                <p className="text-xs text-slate-500">Point browser camera at physical NirmalTag pouch QR code.</p>
               </div>
-            )}
 
-            <button
-              onClick={handleSubmitPickup}
-              className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              <span>Confirm & Finalize Pickup (+₹2.00)</span>
-            </button>
-          </div>
-        )}
+              {scanState === "ERROR" && errorMessage && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-left flex items-start gap-2 text-xs text-red-800">
+                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-bold">Validation Rejection: </strong>
+                    <span>{errorMessage}</span>
+                  </div>
+                </div>
+              )}
 
-        {scanState === "SUBMITTED" && (
-          <div className="py-6 space-y-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8" />
+              <button
+                onClick={() => setIsScannerOpen(true)}
+                className="w-full py-4 brand-gradient text-white font-extrabold text-sm rounded-xl shadow-md hover:opacity-95 transition-opacity flex items-center justify-center gap-2"
+              >
+                <Camera className="w-5 h-5" />
+                <span>Open Browser Camera Scanner</span>
+              </button>
+
+              <div className="pt-2 text-left space-y-2 border-t border-slate-100">
+                <span className="text-[11px] font-bold text-slate-600">Or Enter Tag Serial Manually:</span>
+                <form onSubmit={handleManualScanSubmit} className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="NT-SAN-2026-917201"
+                    value={manualInputCode}
+                    onChange={(e) => setManualInputCode(e.target.value)}
+                    className="flex-1 text-xs p-2.5 rounded-xl border border-slate-300 font-mono"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl"
+                  >
+                    Verify
+                  </button>
+                </form>
+              </div>
             </div>
-            <h3 className="text-base font-bold text-slate-900">Pickup Transaction Verified!</h3>
-            <p className="text-xs text-slate-500">
-              Tag <strong>{scannedCode}</strong> has been transitioned to <strong className="text-red-700">CLOSED</strong> permanently. ₹2.00 added to wallet.
-            </p>
-            <button
-              onClick={() => {
-                setScanState("IDLE");
-                setManualInputCode("");
-              }}
-              className="px-6 py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm hover:bg-slate-800"
-            >
-              Scan Next Pouch
-            </button>
-          </div>
-        )}
-      </div>
+          )}
 
+          {scanState === "SCANNING" && (
+            <div className="py-8 space-y-3">
+              <RefreshCw className="w-8 h-8 animate-spin text-emerald-600 mx-auto" />
+              <p className="text-xs font-semibold text-slate-700">Performing visual evidence verification & verifying QR token...</p>
+            </div>
+          )}
+
+          {scanState === "VALIDATED" && (
+            <div className="space-y-5 text-left border-t border-slate-100 pt-4">
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
+                <div className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">Authoritative Tag Check</div>
+                <div className="text-xs font-mono font-bold text-slate-900">{scannedCode}</div>
+                <div className="text-[11px] text-emerald-800 font-semibold">Status: {scannedTagStatus || "ACTIVE"} • Invariant Rule: Single-Use Only</div>
+              </div>
+
+              {aiResult && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                  <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Visual Verification Engine</div>
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-900">
+                    <span>Status: {aiResult.status}</span>
+                    <span className="text-slate-600">AI Model Missing</span>
+                  </div>
+                  <div className="text-[11px] text-slate-600">{aiResult.category}</div>
+                </div>
+              )}
+
+              <button
+                onClick={handleSubmitPickup}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="w-5 h-5" />
+                <span>Confirm & Finalize Pickup (+₹2.00)</span>
+              </button>
+            </div>
+          )}
+
+          {scanState === "SUBMITTED" && (
+            <div className="py-6 space-y-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">Pickup Transaction Verified!</h3>
+              <p className="text-xs text-slate-500">
+                Tag <strong>{scannedCode}</strong> has been transitioned to <strong className="text-red-700">CLOSED</strong> permanently. ₹2.00 added to wallet.
+              </p>
+              <button
+                onClick={() => {
+                  setScanState("IDLE");
+                  setManualInputCode("");
+                }}
+                className="px-6 py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm hover:bg-slate-800"
+              >
+                Scan Next Pouch
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Direct Payout Modal */}
       {isPayoutModalOpen && (

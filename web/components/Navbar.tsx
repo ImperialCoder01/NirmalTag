@@ -75,9 +75,14 @@ export default function Navbar() {
             />
           </div>
           <div>
-            <span className="font-bold text-xl tracking-tight text-slate-900 group-hover:text-emerald-700 transition-colors">
-              Nirmal<span className="text-emerald-600">Tag</span>
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-xl tracking-tight text-slate-900 group-hover:text-emerald-700 transition-colors">
+                Nirmal<span className="text-emerald-600">Tag</span>
+              </span>
+              <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-900 border border-amber-500/40 text-[9px] font-black tracking-wider uppercase rounded">
+                JUDGE DEMO
+              </span>
+            </div>
             <span className="block text-[10px] uppercase tracking-widest text-slate-500 font-semibold">
               Civic Waste Platform
             </span>
