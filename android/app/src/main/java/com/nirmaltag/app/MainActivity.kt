@@ -1,6 +1,7 @@
 @file:OptIn(androidx.camera.core.ExperimentalGetImage::class)
 package com.nirmaltag.app
 
+import android.app.Activity
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -8,6 +9,12 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -185,21 +192,23 @@ fun AppIntroScreen(onNextClicked: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF8FAFC))
-            .padding(20.dp)
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.SpaceBetween,
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Scrollable content area
         Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Logo & Title
             Box(
                 modifier = Modifier
-                    .size(80.dp)
+                    .size(72.dp)
                     .clip(CircleShape)
                     .border(2.dp, Color(0xFF0D5C3A), CircleShape)
                     .background(Color.White),
@@ -208,27 +217,27 @@ fun AppIntroScreen(onNextClicked: () -> Unit) {
                 Image(
                     painter = painterResource(id = R.drawable.logo),
                     contentDescription = "NirmalTag Logo",
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(56.dp)
                 )
             }
 
             Text(
                 text = "NirmalTag Civic Tech",
-                fontSize = 24.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF0F172A)
             )
 
             Text(
                 text = "\"AI-Verified Sanitary & Special-Care Waste Segregation with Doorstep Circular Credits\"",
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 color = Color(0xFF0D5C3A),
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 12.dp)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             IntroInfoCard(
                 title = "Tamper-Evident QR Pouch Tracking",
@@ -255,31 +264,38 @@ fun AppIntroScreen(onNextClicked: () -> Unit) {
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = onNextClicked,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C3A)),
-            shape = RoundedCornerShape(14.dp)
+        // Fixed bottom CTA button bar - ALWAYS VISIBLE WITHOUT SCROLLING
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.White,
+            shadowElevation = 8.dp
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Get Started / Select User Role",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = Color.White
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowForward,
-                    contentDescription = "Next",
-                    tint = Color.White
-                )
+            Box(modifier = Modifier.padding(16.dp)) {
+                Button(
+                    onClick = onNextClicked,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C3A)),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Get Started / Select User Role",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = Color.White
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = "Next",
+                            tint = Color.White
+                        )
+                    }
+                }
             }
         }
     }
@@ -290,18 +306,18 @@ fun IntroInfoCard(title: String, description: String, icon: androidx.compose.ui.
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(16.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(14.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(Color(0xFFDCFCE7)),
                 contentAlignment = Alignment.Center
             ) {
@@ -309,21 +325,21 @@ fun IntroInfoCard(title: String, description: String, icon: androidx.compose.ui.
                     imageVector = icon,
                     contentDescription = null,
                     tint = Color(0xFF0D5C3A),
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
             Column {
                 Text(
                     text = title,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     color = Color(0xFF0F172A)
                 )
                 Text(
                     text = description,
                     fontSize = 11.sp,
                     color = Color(0xFF64748B),
-                    lineHeight = 15.sp
+                    lineHeight = 14.sp
                 )
             }
         }
@@ -331,7 +347,7 @@ fun IntroInfoCard(title: String, description: String, icon: androidx.compose.ui.
 }
 
 // -------------------------------------------------------------------------
-// SCREEN 2: USER TYPE SELECTION & AUTHENTICATION SCREEN WITH GOOGLE + BROWSER FALLBACK
+// SCREEN 2: USER TYPE SELECTION & AUTHENTICATION SCREEN (GOOGLE & EMAIL AUTH)
 // -------------------------------------------------------------------------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -357,35 +373,76 @@ fun UserTypeAuthScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    fun triggerGoogleLoginWithFallback() {
+    // Google Sign-In Client Configuration
+    val gso = remember {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .build()
+    }
+    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)
+                val idToken = account?.idToken
+                val email = account?.email ?: userEmail.ifBlank { "user@nirmaltag.org" }
+                onEmailChange(email)
+
+                if (idToken != null) {
+                    val credential = GoogleAuthProvider.getCredential(idToken, null)
+                    FirebaseAuth.getInstance().signInWithCredential(credential)
+                        .addOnSuccessListener {
+                            isAuthenticating = false
+                            onAuthSuccess()
+                        }
+                        .addOnFailureListener { e ->
+                            isAuthenticating = false
+                            authErrorMsg = "Firebase credential error: ${e.localizedMessage}"
+                        }
+                } else {
+                    // Authenticated via Google Account Picker; update user email & proceed
+                    isAuthenticating = false
+                    onAuthSuccess()
+                }
+            } catch (e: ApiException) {
+                isAuthenticating = false
+                if (e.statusCode == GoogleSignInStatusCodes.SIGN_IN_CANCELLED) {
+                    authErrorMsg = "Google sign-in was cancelled."
+                } else {
+                    authErrorMsg = "Google sign-in failed (Code ${e.statusCode}): ${e.localizedMessage}"
+                }
+            }
+        } else if (result.resultCode == Activity.RESULT_CANCELED) {
+            isAuthenticating = false
+            authErrorMsg = "Google sign-in was cancelled."
+        } else {
+            isAuthenticating = false
+            authErrorMsg = "Google Sign-In failed with result code ${result.resultCode}."
+        }
+    }
+
+    fun triggerGoogleLogin() {
         if (!hasConsent) {
             Toast.makeText(context, "Please agree to DPDP Act 2023 Privacy Policy.", Toast.LENGTH_SHORT).show()
             return
         }
-        val firebaseAuth = FirebaseAuth.getInstance()
-        val cleanEmail = userEmail.trim().ifBlank { "nirmaltag.e2e.collector@gmail.com" }
-        val cleanPassword = if (password == "••••••••" || password.isBlank()) "Nirmaltag@1234" else password
-
         isAuthenticating = true
-        firebaseAuth.signInWithEmailAndPassword(cleanEmail, cleanPassword)
-            .addOnSuccessListener {
-                isAuthenticating = false
-                onAuthSuccess()
-            }
-            .addOnFailureListener { e ->
-                isAuthenticating = false
-                authErrorMsg = "Firebase Sign-In Error: ${e.localizedMessage}"
-                onAuthSuccess()
-            }
+        authErrorMsg = null
+        val signInIntent = googleSignInClient.signInIntent
+        googleSignInLauncher.launch(signInIntent)
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF8FAFC))
-            .padding(16.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -426,27 +483,60 @@ fun UserTypeAuthScreen(
             }
         }
 
-        // STEP 1: DROPDOWN ROLE SELECTION
+        // STEP 1: ROLE SELECTION (Self-Registration Scope: Collector & Household)
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            shape = RoundedCornerShape(14.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "STEP 1: SELECT YOUR USER TYPE (ROLE)",
+                    text = "STEP 1: SELECT YOUR USER ROLE",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color(0xFF0D5C3A)
                 )
 
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFFF1F5F9))
+                        .padding(3.dp)
+                ) {
+                    Button(
+                        onClick = { onRoleSelected(UserRoleType.COLLECTOR) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedRole == UserRoleType.COLLECTOR) Color(0xFF0D5C3A) else Color.Transparent,
+                            contentColor = if (selectedRole == UserRoleType.COLLECTOR) Color.White else Color(0xFF475569)
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        elevation = null
+                    ) {
+                        Text("Field Collector", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                    Button(
+                        onClick = { onRoleSelected(UserRoleType.HOUSEHOLD) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedRole == UserRoleType.HOUSEHOLD) Color(0xFF0D5C3A) else Color.Transparent,
+                            contentColor = if (selectedRole == UserRoleType.HOUSEHOLD) Color.White else Color(0xFF475569)
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        elevation = null
+                    ) {
+                        Text("Household Resident", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
-                        value = selectedRole.label,
+                        value = "${selectedRole.label} (${selectedRole.portalName})",
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Selected Role") },
+                        label = { Text("Active Role Scope") },
                         trailingIcon = {
                             IconButton(onClick = { dropdownExpanded = !dropdownExpanded }) {
                                 Icon(
@@ -458,7 +548,7 @@ fun UserTypeAuthScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { dropdownExpanded = !dropdownExpanded },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF0D5C3A),
                             unfocusedBorderColor = Color(0xFFCBD5E1)
@@ -473,13 +563,13 @@ fun UserTypeAuthScreen(
                             .background(Color.White)
                     ) {
                         Text(
-                            text = "MOST USED (POPULAR)",
+                            text = "SELF-REGISTRATION ROLES",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color(0xFF0D5C3A),
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )
-                        listOf(UserRoleType.HOUSEHOLD, UserRoleType.COLLECTOR).forEach { roleOption ->
+                        listOf(UserRoleType.COLLECTOR, UserRoleType.HOUSEHOLD).forEach { roleOption ->
                             DropdownMenuItem(
                                 text = {
                                     Column {
@@ -506,46 +596,13 @@ fun UserTypeAuthScreen(
                         HorizontalDivider(color = Color(0xFFE2E8F0))
 
                         Text(
-                            text = "RESIDENTIAL & COMMERCIAL",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF0369A1),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
-                        listOf(UserRoleType.RWA_ADMIN, UserRoleType.BWG_ADMIN).forEach { roleOption ->
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(
-                                            text = roleOption.label,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp,
-                                            color = if (roleOption == selectedRole) Color(0xFF0D5C3A) else Color(0xFF0F172A)
-                                        )
-                                        Text(
-                                            text = roleOption.portalName,
-                                            fontSize = 11.sp,
-                                            color = Color(0xFF64748B)
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    onRoleSelected(roleOption)
-                                    dropdownExpanded = false
-                                }
-                            )
-                        }
-
-                        HorizontalDivider(color = Color(0xFFE2E8F0))
-
-                        Text(
-                            text = "MUNICIPAL & SYSTEM ADMIN",
+                            text = "ADMINISTRATIVE & MUNICIPAL (VIEW-ONLY)",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color(0xFF64748B),
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )
-                        listOf(UserRoleType.TAG_OFFICER, UserRoleType.MCD_OFFICER, UserRoleType.SYSTEM_ADMIN).forEach { roleOption ->
+                        listOf(UserRoleType.RWA_ADMIN, UserRoleType.BWG_ADMIN, UserRoleType.TAG_OFFICER, UserRoleType.MCD_OFFICER, UserRoleType.SYSTEM_ADMIN).forEach { roleOption ->
                             DropdownMenuItem(
                                 text = {
                                     Column {
@@ -556,9 +613,9 @@ fun UserTypeAuthScreen(
                                             color = if (roleOption == selectedRole) Color(0xFF0D5C3A) else Color(0xFF0F172A)
                                         )
                                         Text(
-                                            text = roleOption.portalName,
-                                            fontSize = 11.sp,
-                                            color = Color(0xFF64748B)
+                                            text = "${roleOption.portalName} (Admin Provisioned)",
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF94A3B8)
                                         )
                                     }
                                 },
@@ -570,12 +627,6 @@ fun UserTypeAuthScreen(
                         }
                     }
                 }
-
-                Text(
-                    text = "Authenticated user will access ${selectedRole.portalName}.",
-                    fontSize = 11.sp,
-                    color = Color(0xFF64748B)
-                )
             }
         }
 
@@ -583,17 +634,17 @@ fun UserTypeAuthScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            shape = RoundedCornerShape(14.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 // Tab Mode Toggle: Sign In vs Sign Up
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .background(Color(0xFFF1F5F9))
-                        .padding(4.dp)
+                        .padding(3.dp)
                 ) {
                     Button(
                         onClick = { isSignUpMode = false },
@@ -602,10 +653,10 @@ fun UserTypeAuthScreen(
                             containerColor = if (!isSignUpMode) Color(0xFF0D5C3A) else Color.Transparent,
                             contentColor = if (!isSignUpMode) Color.White else Color(0xFF64748B)
                         ),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(8.dp),
                         elevation = null
                     ) {
-                        Text("Sign In", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Sign In", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                     Button(
                         onClick = { isSignUpMode = true },
@@ -614,47 +665,38 @@ fun UserTypeAuthScreen(
                             containerColor = if (isSignUpMode) Color(0xFF0D5C3A) else Color.Transparent,
                             contentColor = if (isSignUpMode) Color.White else Color(0xFF64748B)
                         ),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(8.dp),
                         elevation = null
                     ) {
-                        Text("Sign Up", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Sign Up", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
 
-                Text(
-                    text = if (isSignUpMode) "CREATE NEW ${selectedRole.name} ACCOUNT" else "AUTHENTICATE AS ${selectedRole.name}",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF0D5C3A)
-                )
-
-                // 1-Click Google Sign In (In-App + Browser Fallback)
+                // Standard Google Sign-In Button with 4-Color Google "G" Logo
                 OutlinedButton(
-                    onClick = { triggerGoogleLoginWithFallback() },
+                    onClick = { triggerGoogleLogin() },
+                    enabled = !isAuthenticating,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
+                        .height(46.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
                     border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF4285F4)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("G", color = Color.White, fontWeight = FontWeight.Black, fontSize = 12.sp)
-                        }
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_google_logo),
+                            contentDescription = "Google Logo",
+                            modifier = Modifier.size(20.dp)
+                        )
                         Text(
-                            text = if (isSignUpMode) "Sign Up as ${selectedRole.label} with Google" else "Sign In as ${selectedRole.label} with Google",
+                            text = "Continue with Google",
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp,
-                            color = Color(0xFF334155)
+                            fontSize = 13.sp,
+                            color = Color(0xFF1E293B)
                         )
                     }
                 }
@@ -674,9 +716,9 @@ fun UserTypeAuthScreen(
                         value = fullName,
                         onValueChange = { fullName = it },
                         label = { Text("Full Name") },
-                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp)) },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         singleLine = true
                     )
                 }
@@ -685,9 +727,9 @@ fun UserTypeAuthScreen(
                     value = userEmail,
                     onValueChange = onEmailChange,
                     label = { Text("Email Address") },
-                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     singleLine = true
                 )
 
@@ -695,10 +737,10 @@ fun UserTypeAuthScreen(
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Password") },
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     singleLine = true
                 )
 
@@ -706,10 +748,10 @@ fun UserTypeAuthScreen(
                     OutlinedTextField(
                         value = colonyName,
                         onValueChange = { colonyName = it },
-                        label = { Text("Colony / Ward / Establishment Name") },
-                        leadingIcon = { Icon(Icons.Default.Home, contentDescription = null) },
+                        label = { Text("Colony / Ward Name") },
+                        leadingIcon = { Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(18.dp)) },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         singleLine = true
                     )
                 }
@@ -719,9 +761,9 @@ fun UserTypeAuthScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xFFF8FAFC))
-                        .padding(8.dp)
+                        .padding(6.dp)
                 ) {
                     Checkbox(
                         checked = hasConsent,
@@ -729,7 +771,7 @@ fun UserTypeAuthScreen(
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Agree to DPDP Act 2023 Privacy Policy & Terms",
+                            text = "Agree to DPDP Act 2023 Privacy Policy",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF334155)
@@ -801,21 +843,21 @@ fun UserTypeAuthScreen(
                     enabled = !isAuthenticating,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
+                        .height(48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C3A)),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     if (isAuthenticating) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(20.dp),
                             color = Color.White,
-                            strokeWidth = 2.5.dp
+                            strokeWidth = 2.dp
                         )
                     } else {
                         Text(
                             text = if (isSignUpMode) "Create Account as ${selectedRole.label}" else "Sign In as ${selectedRole.label}",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             color = Color.White
                         )
                     }

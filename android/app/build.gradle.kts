@@ -96,6 +96,12 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-analytics-ktx")
 
+    // Google Sign-In & Credential Manager
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
     // CameraX
     implementation("androidx.camera:camera-core:1.3.1")
     implementation("androidx.camera:camera-camera2:1.3.1")
