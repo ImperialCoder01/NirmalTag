@@ -30,7 +30,7 @@ NirmalTag is a production-grade, offline-first civic-tech platform designed for 
 | **Release APK** (Primary) | `NirmalTag.apk` | `46,855,064 bytes` (~44.68 MB) | `F249A146D6C613019FA628B2E0B323A754651D5DD19F7F2AF0193F54AE944319` |
 | **Release AAB** (Future Channel) | `app-release.aab` | `26,429,374 bytes` (~25.20 MB) | `8EB15BD30F9EC275E461469E88999056694C2CCB4709F0EF23400EE938044F4E` |
 
-> **AI Capability Status**: `MODEL_UNAVAILABLE`. No trained domain-specific `.tflite` model asset is bundled in `android/app/src/main/assets/`. Visual evidence verification operates via visual photo inspection without claiming trained AI inference.
+> **AI Capability Status**: `MODEL_UNAVAILABLE` (Infrastructure Ready). On-device TensorFlow Lite engine (`VisualVerificationEngine.kt`), 5-class contract, softmax confidence thresholding (80%), and 6 failure states are fully implemented and verified on physical Android hardware. Public dataset ingestion is automated (`download_public_datasets.py`). Domain-specific model training remains intentionally deferred until real field photos are collected.
 
 ---
 
