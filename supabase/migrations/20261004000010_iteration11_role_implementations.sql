@@ -1,5 +1,5 @@
 -- ============================================================
--- NIRMALTAG ITERATION 11 — 7-ROLE CORE BUSINESS PROCEDURES & RLS POLICIES
+-- NIRMALTAG ITERATION 11 & 11.2 — 7-ROLE CORE BUSINESS PROCEDURES & RLS POLICIES
 -- Migration 20261004000010_iteration11_role_implementations.sql
 -- ============================================================
 
@@ -31,7 +31,7 @@ BEGIN
     END IF;
 
     IF p_credits_spent <= 0 THEN
-        RAISE EXCEPTION 'Invalid Amount: Credits spent must be greater than zero.' USING ERRCODE = '42P01';
+        RAISE EXCEPTION 'Invalid Amount: Credits spent must be greater than zero.' USING ERRCODE = '22023';
     END IF;
 
     v_idempotency_key := COALESCE(p_idempotency_key, 'RED-' || v_household_id || '-' || extract(epoch from now())::text);
@@ -55,11 +55,11 @@ BEGIN
     FOR UPDATE;
 
     IF v_credit_account_id IS NULL THEN
-        RAISE EXCEPTION 'Credit Account Not Found for household.' USING ERRCODE = '42P01';
+        RAISE EXCEPTION 'Credit Account Not Found for household.' USING ERRCODE = '22000';
     END IF;
 
     IF v_current_balance < p_credits_spent THEN
-        RAISE EXCEPTION 'Insufficient Credits: Account balance (%) is less than requested reward cost (%).', v_current_balance, p_credits_spent USING ERRCODE = '42P01';
+        RAISE EXCEPTION 'Insufficient Credits: Account balance (%) is less than requested reward cost (%).', v_current_balance, p_credits_spent USING ERRCODE = '22000';
     END IF;
 
     -- Deduct balance
@@ -121,11 +121,11 @@ BEGIN
     FROM tags WHERE id = p_old_tag_id FOR UPDATE;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Original tag % not found.', p_old_tag_id;
+        RAISE EXCEPTION 'Original tag % not found.', p_old_tag_id USING ERRCODE = '22000';
     END IF;
 
     IF v_old_status = 'CLOSED' THEN
-        RAISE EXCEPTION 'Invariant Violation: Cannot replace a CLOSED terminal tag.' USING ERRCODE = '42P01';
+        RAISE EXCEPTION 'Invariant Violation: Cannot replace a CLOSED terminal tag.' USING ERRCODE = '22000';
     END IF;
 
     -- Lock new tag
@@ -134,11 +134,11 @@ BEGIN
     FROM tags WHERE id = p_new_tag_id FOR UPDATE;
 
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Replacement tag % not found.', p_new_tag_id;
+        RAISE EXCEPTION 'Replacement tag % not found.', p_new_tag_id USING ERRCODE = '22000';
     END IF;
 
     IF v_new_status IN ('ASSIGNED', 'ACTIVE', 'SCANNED', 'PICKUP_PENDING', 'CLOSED', 'REPLACED') THEN
-        RAISE EXCEPTION 'Replacement tag % is not in available inventory (Status: %).', v_new_code, v_new_status USING ERRCODE = '42P01';
+        RAISE EXCEPTION 'Replacement tag % is not in available inventory (Status: %).', v_new_code, v_new_status USING ERRCODE = '22000';
     END IF;
 
     -- Mark old tag REPLACED
@@ -240,7 +240,7 @@ BEGIN
 
     SELECT id INTO v_role_id FROM roles WHERE name = p_role_name;
     IF v_role_id IS NULL THEN
-        RAISE EXCEPTION 'Role % does not exist in roles table.', p_role_name USING ERRCODE = '42P01';
+        RAISE EXCEPTION 'Role % does not exist in roles table.', p_role_name USING ERRCODE = '22000';
     END IF;
 
     INSERT INTO user_roles (user_id, role_id, assigned_by)
