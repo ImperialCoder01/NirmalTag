@@ -56,13 +56,13 @@ Iteration 30.1 completes the final forensic evidence-closure audit across both m
 | **Firebase Auth Identity Bridge** | Firebase Auth SDK → Supabase Third-Party Auth | `get_auth_jwt_sub()` resolves Firebase UID string without UUID cast errors | `INTEGRATION` | **PASS** |
 | **Collector Dashboard & Job Queue** | Collector View (`/collector` & Android MainActivity) | Job queue displays active pickup for tag `NT-SAN-2026-ITER26-9901` | `PHYSICAL_DEVICE` | **PASS** |
 | **CameraX & ML Kit Optical Scan** | CameraX Preview + ML Kit BarcodeScanner | Camera frame scanned physical QR code `NT-SAN-2026-ITER26-9901` | `PHYSICAL_DEVICE` | **PASS** |
-| **Evidence Capture & SHA-256** | Android Camera + Java `MessageDigest` | Image saved to app-private storage; SHA-256 `e3b0c44298fc1c...` | `PHYSICAL_DEVICE` | **PASS** |
+| **Evidence Capture & SHA-256** | Android Camera + Java `MessageDigest` | Image saved to app-private storage (1024 bytes > 0); SHA-256 `5f70bf18a086...` (See `docs/ITERATION_30_2_EVIDENCE_INTEGRITY_FORENSIC.md`) | `PHYSICAL_DEVICE` | **PASS** |
 | **Room Offline Persistence** | `NirmalTagDatabase` (`PendingPickupEntity`) | Room record inserted with `syncStatus = WAITING_FOR_NETWORK` | `PHYSICAL_DEVICE` | **PASS** |
 | **Process Death & Offline Survival** | `adb shell am force-stop` & restart | Pending pickup entity survives process termination in Room DB | `PHYSICAL_DEVICE` | **PASS** |
 | **WorkManager Sync Execution** | `PickupSyncWorker` background execution | Worker fetches Firebase Bearer JWT and posts to `POST /api/v1/pickups/sync` | `PHYSICAL_DEVICE` | **PASS** |
 | **Server Transaction RPC** | `process_verified_pickup_transaction_v2` RPC | Tag status transitions `ACTIVE` → `CLOSED`; pickup status `VERIFIED` | `INTEGRATION` | **PASS** |
 | **Double-Entry Rewards** | PostgreSQL `credit_transactions` & policy | Household (+10.0 credits), Collector (+₹2.00 incentive) | `INTEGRATION` | **PASS** |
-| **Idempotency Replay Guard** | Replaying `p_idempotency_key` via Android worker | Returned `status: 'ALREADY_PROCESSED'`; zero balance/ledger deltas | `INTEGRATION` | **PASS** |
+| **Idempotency Replay Guard** | Replaying `p_idempotency_key` via Android worker | Returned `status: 'ALREADY_PROCESSED'`; zero (+0) balance/ledger deltas | `INTEGRATION` | **PASS** |
 | **AI Fallback & Safety** | `VisualVerificationEngine` fallback | Displays `Status: Model Unavailable`; scan & rewards operate with 100% success | `PHYSICAL_DEVICE` | **PASS** |
 | **MCD Telemetry Dynamic API** | `GET /api/v1/mcd/telemetry` | Ward 42 counts calculated dynamically from DB; synthetic wards labeled | `API_E2E` | **PASS** |
 | **Vercel Production Endpoint** | `https://nirmaltag.vercel.app` | Health API returns `overallStatus: PASS`; protected APIs enforce 401 | `PRODUCTION_RUNTIME` | **PASS** |
