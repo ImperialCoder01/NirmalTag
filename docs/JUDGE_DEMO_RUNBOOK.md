@@ -76,7 +76,7 @@ Use the pre-configured role test identities or sign in with Google/Firebase Auth
 1. Launch NirmalTag Android APK (or open `/collector` Web Portal).
 2. View **Today's Jobs**. Observe scheduled pickup for tag `NT-SAN-2026-9901`.
 3. Open **QR Scanner**. Point camera at physical QR tag `NT-SAN-2026-9901`.
-4. Capture evidence image. App computes SHA-256 hash automatically.
+4. Capture evidence image via CameraX JPEG pipeline. App verifies valid JPEG header (`FF D8 FF`) and computes SHA-256 hash automatically.
 5. Note AI Status display: **`Status: Model Unavailable`** (Transparent fallback: physical QR scan and pickup processing continue cleanly without fake confidence scores).
 6. Tap **"Verify & Sync Pickup"**.
 

@@ -126,8 +126,13 @@ class PickupSyncWorker(
             return kotlin.Result.failure(Exception("EVIDENCE_FILE_MISSING: Evidence photo file not found at path ${pickup.photoLocalUri}"))
         }
 
+        val fileBytes = file.readBytes()
+        if (fileBytes.size < 3 || fileBytes[0] != 0xFF.toByte() || fileBytes[1] != 0xD8.toByte() || fileBytes[2] != 0xFF.toByte()) {
+            return kotlin.Result.failure(Exception("EVIDENCE_INVALID_JPEG: Evidence file at ${pickup.photoLocalUri} lacks valid JPEG header (FF D8 FF)"))
+        }
+
         val computedHash = MessageDigest.getInstance("SHA-256")
-            .digest(file.readBytes())
+            .digest(fileBytes)
             .joinToString("") { "%02x".format(it) }
 
         if (computedHash != pickup.photoSha256) {
