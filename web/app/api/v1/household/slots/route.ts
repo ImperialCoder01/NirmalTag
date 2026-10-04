@@ -14,13 +14,19 @@ export async function GET(request: Request) {
       }, { status: 401 });
     }
 
-    const { supabaseUserClient, profileId } = authResult;
+    const { supabaseUserClient, user } = authResult;
 
-    const { data: household } = await supabaseUserClient
+    const { data: profile } = await supabaseUserClient
+      .from("profiles")
+      .select("id")
+      .or(`firebase_uid.eq.${user.uid},id.eq.${user.uid}`)
+      .single();
+
+    const { data: household } = profile ? await supabaseUserClient
       .from("households")
       .select("ward_id")
-      .eq("user_id", profileId)
-      .single();
+      .eq("user_id", profile.id)
+      .single() : { data: null };
 
     const wardId = household?.ward_id;
 

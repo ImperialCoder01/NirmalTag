@@ -14,12 +14,22 @@ export async function GET(request: Request) {
       }, { status: 401 });
     }
 
-    const { supabaseUserClient, profileId } = authResult;
+    const { supabaseUserClient, user } = authResult;
+
+    const { data: profile } = await supabaseUserClient
+      .from("profiles")
+      .select("id")
+      .or(`firebase_uid.eq.${user.uid},id.eq.${user.uid}`)
+      .single();
+
+    if (!profile) {
+      return NextResponse.json({ success: true, notifications: [], unreadCount: 0 });
+    }
 
     const { data: notifications, error } = await supabaseUserClient
       .from("in_app_notifications")
       .select("*")
-      .eq("user_id", profileId)
+      .eq("user_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(20);
 
@@ -60,7 +70,18 @@ export async function PATCH(request: Request) {
       }, { status: 401 });
     }
 
-    const { supabaseUserClient, profileId } = authResult;
+    const { supabaseUserClient, user } = authResult;
+
+    const { data: profile } = await supabaseUserClient
+      .from("profiles")
+      .select("id")
+      .or(`firebase_uid.eq.${user.uid},id.eq.${user.uid}`)
+      .single();
+
+    if (!profile) {
+      return NextResponse.json({ success: true });
+    }
+
     const body = await request.json().catch(() => ({}));
     const { notificationId } = body;
 
@@ -69,12 +90,12 @@ export async function PATCH(request: Request) {
         .from("in_app_notifications")
         .update({ is_read: true })
         .eq("id", notificationId)
-        .eq("user_id", profileId);
+        .eq("user_id", profile.id);
     } else {
       await supabaseUserClient
         .from("in_app_notifications")
         .update({ is_read: true })
-        .eq("user_id", profileId)
+        .eq("user_id", profile.id)
         .eq("is_read", false);
     }
 

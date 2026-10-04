@@ -62,12 +62,22 @@ export async function GET(request: Request) {
       }, { status: 401 });
     }
 
-    const { supabaseUserClient, profileId } = authResult;
+    const { supabaseUserClient, user } = authResult;
+
+    const { data: profile } = await supabaseUserClient
+      .from("profiles")
+      .select("id")
+      .or(`firebase_uid.eq.${user.uid},id.eq.${user.uid}`)
+      .single();
+
+    if (!profile) {
+      return NextResponse.json({ success: true, requests: [] });
+    }
 
     const { data: household } = await supabaseUserClient
       .from("households")
       .select("id")
-      .eq("user_id", profileId)
+      .eq("user_id", profile.id)
       .single();
 
     if (!household) {
