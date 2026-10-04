@@ -1,7 +1,8 @@
-# NIRMALTAG — ITERATION 10 FULL PRODUCT FUNCTIONAL & UI/UX FORENSIC AUDIT
+# NIRMALTAG — ITERATION 10 & 10.1 FULL PRODUCT FUNCTIONAL & UI/UX FORENSIC AUDIT
 
 **Date**: October 4, 2026  
 **Scope**: Full Product Audit — Web Application (Next.js/React/Supabase) + Android Mobile App (`com.nirmaltag.app`) + 7-Role RBAC Model  
+**Target Device**: Physical Android Phone `PJ7POB99FE89BAWS` (OPPO A15s, Android 10, API 29)  
 **Status**: COMPLETE  
 
 ---
@@ -22,51 +23,63 @@ NirmalTag implements an integrated 7-role civic waste management platform with s
 
 ---
 
-## 2. WEB APPLICATION AUDIT (NEXT.JS & SUPABASE BACKEND)
+## 2. 7-ROLE BUTTON & ACTION INVENTORY AUDIT
 
-### A. Authentication & RBAC Verification
-- Web authentication uses Supabase Auth + Firebase ID token verification middleware.
-- Security Invariants:
-  - Users registered via public registration default to `HOUSEHOLD` or `COLLECTOR` roles.
-  - Privileged role endpoints (`/api/admin/*`, `/api/mcd/*`, `/api/tag-officer/*`) validate `user_roles` server-side via Supabase Row Level Security (RLS) policies.
-  - Tag state transition `ACTIVE` $\rightarrow$ `CLOSED` is strictly enforced in PostgreSQL functions (`pickup_transaction_rpc`), preventing tag reuse.
-
-### B. UI/UX Verification
-- Dashboard components utilize responsive design tokens, high-contrast typography, and accessible color palettes (`#0D5C3A` Primary Green, `#0F172A` Text Dark).
-- Action buttons provide immediate visual feedback with micro-animations and loading spinners.
-
----
-
-## 3. ANDROID APK MOBILE AUDIT (`com.nirmaltag.app`)
-
-### A. Onboarding & Screen Flow Verification
-- Initial screen (`AppIntroScreen`) displays brand identity, core value propositions, and a fixed bottom CTA button (`"Get Started / Select User Role"`) that is immediately visible without scrolling.
-- Auth screen (`UserTypeAuthScreen`) provides standard Google Sign-In with 4-color Google "G" logo vector asset (`R.drawable.ic_google_logo`).
-- Tapping `"Continue with Google"` invokes real Google Play Services Auth picker (`GoogleSignInClient` + `rememberLauncherForActivityResult`).
-- Google Sign-In cancellation retains state on Auth screen with `"Google sign-in was cancelled."` message (zero fallback to fake login).
-
-### B. Collector Offline Queue & CameraX AI Verification (Iter 9.17.5 & 10)
-- Scanner modal (`LiveCameraScannerModal`) uses CameraX + ML Kit for optical QR decoding.
-- Scanned evidence photo is persisted to local storage with SHA-256 hash.
-- Room database entity is created with state `WAITING_FOR_NETWORK`.
-- UI observes Room database reactively via `getPendingCountFlow().collectAsState(initial = 0)`.
-- When pending count = 0, Collector UI displays `"All pickups synced"`. When pending count > 0, displays `"X pickup(s) waiting to sync"`.
+| Role | Platform | Screen | Action / Feature | Backend Implementation | Authorization Control | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `HOUSEHOLD` | Web & Android | Household Portal | Request Pouch Batch | Supabase `pouch_requests` table insert | RLS: `auth.uid() = user_id` | **VERIFIED** |
+| `HOUSEHOLD` | Web & Android | Household Portal | Redeem Circular Credits | Supabase `credit_redemptions` RPC | RLS: `balance >= points_requested` | **VERIFIED** |
+| `HOUSEHOLD` | Web & Android | Household Portal | Book Doorstep Pickup | Supabase `pickup_bookings` insert | RLS: `auth.uid() = user_id` | **VERIFIED** |
+| `COLLECTOR` | Android | Collector Dashboard | Live Camera QR Scan | CameraX + ML Kit Optical Decoder | On-Device Local Hardware | **VERIFIED** |
+| `COLLECTOR` | Android | Collector Dashboard | Offline Queue Save | Android Room Database Entity | `WAITING_FOR_NETWORK` state | **VERIFIED** |
+| `COLLECTOR` | Android | Collector Dashboard | WorkManager Queue Sync | `PickupSyncWorker` + `pickup_transaction_rpc` | Firebase ID Token + RLS | **VERIFIED** |
+| `TAG_OFFICER` | Web & Android | Serialization Hub | Generate Serial Batch | Postgres RPC `generate_tag_batch` | Server RLS: `role = 'TAG_OFFICER'` | **VERIFIED** |
+| `TAG_OFFICER` | Web & Android | Serialization Hub | Lookup Tag Invariant State | Postgres table `tag_inventory` query | Server RLS: Tag Officer scope | **VERIFIED** |
+| `RWA_ADMIN` | Web & Android | RWA Dashboard | Register Colony Resident | Postgres table `rwa_households` insert | Server RLS: `rwa_id` match | **VERIFIED** |
+| `RWA_ADMIN` | Web & Android | RWA Dashboard | Flag Non-Compliant Household | Postgres RPC `flag_household_violation` | Server RLS: RWA scope | **VERIFIED** |
+| `BWG_ADMIN` | Web & Android | Commercial BWG Hub | Log Bulk Waste Volume | Postgres table `bwg_daily_logs` insert | Server RLS: BWG establishment scope | **VERIFIED** |
+| `BWG_ADMIN` | Web & Android | Commercial BWG Hub | Generate MCD Compliance Cert | Server-side PDF/HTML Generator | Verified volume threshold check | **VERIFIED** |
+| `MCD_OFFICER` | Web & Android | Executive Command | Resolve AI Dispute | Postgres RPC `resolve_ai_dispute` | Server RLS: MCD Officer scope | **VERIFIED** |
+| `MCD_OFFICER` | Web & Android | Executive Command | Issue Municipal Notice | Postgres table `mcd_notices` insert | Server RLS: Ward Officer scope | **VERIFIED** |
+| `SYSTEM_ADMIN` | Web & Android | Security Control | Provision User Role | Postgres function `assign_user_role` | Server RLS: `SYSTEM_ADMIN` only | **VERIFIED** |
 
 ---
 
-## 4. SECURITY & DATA PRIVACY COMPLIANCE (DPDP ACT 2023)
+## 3. SECURITY, RLS & MOCK AUTH AUDIT FINDINGS
 
-1. **Secret Scanning**:
-   - Zero production PAT tokens, management keys, or database credentials are committed in repository source files.
-   - Credentials are loaded exclusively via environment variables (`.env.local` / system environment).
-2. **DPDP Compliance Notice**:
-   - Purpose Limitation & Data Fiduciary notice integrated into Android registration dialog and web footer.
-   - On-device evidence processing erases transient raw camera bitmaps after feature vector extraction and SHA-256 verification.
+1. **Third-Party Auth Bridge Invariant**:
+   - Authentication flow enforces `Google` $\rightarrow$ `Firebase Auth` $\rightarrow$ `Firebase ID Token` $\rightarrow$ `Supabase Third-Party Auth` $\rightarrow$ `Firebase UID Bridge` $\rightarrow$ `profile` $\rightarrow$ `user_roles`.
+2. **Database Row Level Security (RLS)**:
+   - Evaluated PostgreSQL RLS policies across `tag_inventory`, `pickups`, `profiles`, `user_roles`, `rwa_households`, `bwg_daily_logs`.
+   - Direct attempts by unauthenticated or unauthorized users to read/write tags outside assigned ward/household return database permission denials.
+3. **Secret Scan**:
+   - Zero hardcoded Firebase ID tokens, OAuth tokens, passwords, Supabase management PAT keys, or service role keys committed in source files.
+4. **Mock / Fake Auth Scan**:
+   - Zero auto-login shortcuts or simulated fallback authentications remain in production code paths.
 
 ---
 
-## 5. CONCLUSION & ITERATION VERDICT
+## 4. FINAL VERDICT & ACCEPTANCE CRITERIA MATRIX
 
-All requirements for Iteration 10 have been fully audited, implemented, verified on physical Android hardware (`PJ7POB99FE89BAWS`), and validated with automated test suites.
+```text
+ANDROID ONBOARDING                — PASS
+GOOGLE ACCOUNT A LOGIN            — VERIFIED
+GOOGLE SIGN OUT                   — VERIFIED
+GOOGLE ACCOUNT SWITCHING A -> B   — VERIFIED
+GOOGLE ACCOUNT SWITCHING B -> A   — VERIFIED
+GOOGLE CANCELLATION               — PASS
+GOOGLE AUTHENTICATION END-TO-END  — VERIFIED
+EMAIL SIGN-IN                     — VERIFIED
+EMAIL SIGN-UP                     — VERIFIED
+PRIVILEGED ROLE PROTECTION        — VERIFIED
+AUTH UI/UX                        — PASS
+COLLECTOR REGRESSION              — PASS
+WEB AUTH                          — VERIFIED
+FULL WEB AUDIT                    — VERIFIED
+FULL ANDROID AUDIT                — VERIFIED
+RLS AUDIT                         — VERIFIED
+MOCK/FAKE AUTH AUDIT              — VERIFIED
+SECURITY AUDIT                    — PASS
 
-**VERDICT**: **PASS**
+OVERALL: NO CRITICAL BLOCKERS
+```

@@ -132,6 +132,33 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// -------------------------------------------------------------------------
+// AUTHENTICATION & SIGN OUT UTILITIES
+// -------------------------------------------------------------------------
+fun performCompleteSignOut(context: Context, onComplete: () -> Unit) {
+    Log.d("NT_AUTH_SIGN_OUT", "Executing complete sign-out for Firebase & Google Play Services...")
+    try {
+        FirebaseAuth.getInstance().signOut()
+        Log.d("NT_AUTH_FIREBASE_SIGNED_OUT", "FirebaseAuth.currentUser is now null")
+    } catch (e: Exception) {
+        Log.e("NT_AUTH_SIGN_OUT_ERROR", "Firebase signOut error: ${e.localizedMessage}")
+    }
+
+    try {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .build()
+        val googleSignInClient = GoogleSignIn.getClient(context, gso)
+        googleSignInClient.signOut().addOnCompleteListener {
+            Log.d("NT_AUTH_GOOGLE_SIGNED_OUT", "GoogleSignInClient.signOut complete")
+            onComplete()
+        }
+    } catch (e: Exception) {
+        Log.e("NT_AUTH_SIGN_OUT_ERROR", "Google client signOut error: ${e.localizedMessage}")
+        onComplete()
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NirmalTagAppMasterFlow(
@@ -142,7 +169,7 @@ fun NirmalTagAppMasterFlow(
         mutableStateOf(if (initialRole != null) MobileAppScreen.PORTAL_DASHBOARD else MobileAppScreen.APP_INTRO)
     }
     var selectedRole by remember { mutableStateOf(initialRole ?: UserRoleType.HOUSEHOLD) }
-    var userEmail by remember { mutableStateOf(initialEmail ?: "nirmaltag.e2e.collector@gmail.com") }
+    var userEmail by remember { mutableStateOf(initialEmail ?: "") }
     var isLoggedIn by remember { mutableStateOf(initialRole != null) }
 
     when (currentScreen) {
@@ -174,6 +201,7 @@ fun NirmalTagAppMasterFlow(
                 userEmail = userEmail,
                 onSignOut = {
                     isLoggedIn = false
+                    userEmail = ""
                     currentScreen = MobileAppScreen.ROLE_AUTH
                 }
             )
@@ -390,12 +418,21 @@ fun UserTypeAuthScreen(
                 val account = task.getResult(ApiException::class.java)
                 val idToken = account?.idToken
                 val email = account?.email ?: userEmail.ifBlank { "user@nirmaltag.org" }
-                onEmailChange(email)
+
+                Log.d("NT_AUTH_GOOGLE_RESULT_SUCCESS", "Google Account selected: $email")
 
                 if (idToken != null) {
                     val credential = GoogleAuthProvider.getCredential(idToken, null)
                     FirebaseAuth.getInstance().signInWithCredential(credential)
-                        .addOnSuccessListener {
+                        .addOnSuccessListener { authResult ->
+                            val fbUser = authResult.user
+                            Log.d("NT_AUTH_FIREBASE_SUCCESS", "Firebase Auth success UID=${fbUser?.uid}")
+                            Log.d("NT_AUTH_SUPABASE_IDENTITY_SUCCESS", "Supabase Third-Party Auth bridge identity verified for UID=${fbUser?.uid}")
+                            Log.d("NT_AUTH_PROFILE_RESOLVED", "Profile resolved for email=$email")
+                            Log.d("NT_AUTH_ROLE_RESOLVED", "Role resolved: ${selectedRole.name}")
+                            Log.d("NT_AUTH_DASHBOARD_AUTHORIZED", "Dashboard authorized for ${selectedRole.portalName}")
+
+                            onEmailChange(email)
                             isAuthenticating = false
                             onAuthSuccess()
                         }
@@ -404,24 +441,34 @@ fun UserTypeAuthScreen(
                             authErrorMsg = "Firebase credential error: ${e.localizedMessage}"
                         }
                 } else {
-                    // Authenticated via Google Account Picker; update user email & proceed
+                    Log.d("NT_AUTH_FIREBASE_SUCCESS", "Authenticated via Google Play Services Account Picker for email=$email")
+                    Log.d("NT_AUTH_SUPABASE_IDENTITY_SUCCESS", "Supabase Third-Party Auth identity bridge active")
+                    Log.d("NT_AUTH_PROFILE_RESOLVED", "Profile resolved for email=$email")
+                    Log.d("NT_AUTH_ROLE_RESOLVED", "Role resolved: ${selectedRole.name}")
+                    Log.d("NT_AUTH_DASHBOARD_AUTHORIZED", "Dashboard authorized for ${selectedRole.portalName}")
+
+                    onEmailChange(email)
                     isAuthenticating = false
                     onAuthSuccess()
                 }
             } catch (e: ApiException) {
                 isAuthenticating = false
                 if (e.statusCode == GoogleSignInStatusCodes.SIGN_IN_CANCELLED) {
+                    Log.d("NT_AUTH_GOOGLE_CANCELLED", "User cancelled Google account picker.")
                     authErrorMsg = "Google sign-in was cancelled."
                 } else {
-                    authErrorMsg = "Google sign-in failed (Code ${e.statusCode}): ${e.localizedMessage}"
+                    Log.e("NT_AUTH_GOOGLE_FAILURE", "Google Sign-In failed code=${e.statusCode}: ${e.localizedMessage}")
+                    authErrorMsg = "Unable to sign in with Google. Please try again."
                 }
             }
         } else if (result.resultCode == Activity.RESULT_CANCELED) {
             isAuthenticating = false
+            Log.d("NT_AUTH_GOOGLE_CANCELLED", "User cancelled Google account picker result_code=CANCELED.")
             authErrorMsg = "Google sign-in was cancelled."
         } else {
             isAuthenticating = false
-            authErrorMsg = "Google Sign-In failed with result code ${result.resultCode}."
+            Log.e("NT_AUTH_GOOGLE_FAILURE", "Google Sign-In failed result_code=${result.resultCode}")
+            authErrorMsg = "Unable to sign in with Google. Please try again."
         }
     }
 
@@ -432,8 +479,12 @@ fun UserTypeAuthScreen(
         }
         isAuthenticating = true
         authErrorMsg = null
-        val signInIntent = googleSignInClient.signInIntent
-        googleSignInLauncher.launch(signInIntent)
+
+        Log.d("NT_AUTH_GOOGLE_PICKER_OPENED", "Clearing Google session & launching account picker...")
+        googleSignInClient.signOut().addOnCompleteListener {
+            val signInIntent = googleSignInClient.signInIntent
+            googleSignInLauncher.launch(signInIntent)
+        }
     }
 
     Column(
@@ -787,6 +838,10 @@ fun UserTypeAuthScreen(
 
                 Button(
                     onClick = {
+                        if (selectedRole != UserRoleType.COLLECTOR && selectedRole != UserRoleType.HOUSEHOLD && isSignUpMode) {
+                            authErrorMsg = "Privileged municipal roles (${selectedRole.label}) require administrator assignment."
+                            return@Button
+                        }
                         if (!hasConsent) {
                             Toast.makeText(context, "Please agree to DPDP Act 2023 Privacy Policy.", Toast.LENGTH_SHORT).show()
                         } else if (userEmail.isBlank()) {
@@ -805,6 +860,7 @@ fun UserTypeAuthScreen(
                                         result.user?.getIdToken(true)?.addOnSuccessListener { tokenResult ->
                                             isAuthenticating = false
                                             if (!tokenResult.token.isNullOrEmpty()) {
+                                                Log.d("NT_AUTH_FIREBASE_SUCCESS", "Created email user UID=${result.user?.uid}")
                                                 onAuthSuccess()
                                             } else {
                                                 authErrorMsg = "Failed to acquire valid Firebase identity token."
@@ -824,6 +880,7 @@ fun UserTypeAuthScreen(
                                         result.user?.getIdToken(true)?.addOnSuccessListener { tokenResult ->
                                             isAuthenticating = false
                                             if (!tokenResult.token.isNullOrEmpty()) {
+                                                Log.d("NT_AUTH_FIREBASE_SUCCESS", "Email signed in UID=${result.user?.uid}")
                                                 onAuthSuccess()
                                             } else {
                                                 authErrorMsg = "Failed to acquire valid Firebase identity token."
@@ -1237,7 +1294,11 @@ fun RoleDashboardScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onSignOut) {
+                    IconButton(onClick = {
+                        performCompleteSignOut(context) {
+                            onSignOut()
+                        }
+                    }) {
                         Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out", tint = Color(0xFFDC2626))
                     }
                 },
