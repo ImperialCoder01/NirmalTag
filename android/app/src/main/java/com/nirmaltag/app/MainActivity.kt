@@ -943,6 +943,7 @@ fun LiveCameraScannerModal(
                                                             if (!rawValue.isNullOrEmpty()) {
                                                                 Log.d("CollectorScanner", "QR_SCAN_RAW_VALUE=$rawValue")
                                                                 Log.d("CollectorScanner", "QR_SCAN_SUCCESS=true")
+                                                                Log.d("NT_E2E_QR_SUCCESS", "Tag serial decoded: ${rawValue.trim()}")
 
                                                                 if (TagValidationUtil.isValidTagSerial(rawValue)) {
                                                                     ContextCompat.getMainExecutor(ctx).execute {
@@ -1077,6 +1078,7 @@ fun LiveCameraScannerModal(
                             Toast.makeText(context, "Evidence capture failed. Image file not saved.", Toast.LENGTH_LONG).show()
                             return@Button
                         }
+                        Log.d("NT_E2E_EVIDENCE_SAVED", "Evidence photo persisted to: ${localFile.absolutePath}")
 
                         // 3. Compute SHA256 Evidence Hash
                         val sha256 = MessageDigest.getInstance("SHA-256").digest(localFile.readBytes())
@@ -1104,6 +1106,7 @@ fun LiveCameraScannerModal(
                         // 5. Insert to Room & Schedule Background WorkManager Sync
                         coroutineScope.launch(Dispatchers.IO) {
                             NirmalTagDatabase.getDatabase(context).pickupDao().insertPickup(entity)
+                            Log.d("NT_E2E_ROOM_INSERT", "Inserted entity localPickupId=$localPickupId tagSerial=${entity.tagSerialCode} state=${entity.state}")
                             PickupSyncWorker.scheduleSync(context)
                         }
 

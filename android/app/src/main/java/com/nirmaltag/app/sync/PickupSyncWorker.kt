@@ -29,6 +29,7 @@ class PickupSyncWorker(
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val pendingList = pickupDao.getUnsyncedPickups()
+        Log.d("NT_E2E_WORKER_STARTED", "PickupSyncWorker starting. Pending items count=${pendingList.size}")
         if (pendingList.isEmpty()) {
             Log.d(TAG, "No pending pickups to sync in local Room queue.")
             return@withContext Result.success()
@@ -59,6 +60,7 @@ class PickupSyncWorker(
                         errorMsg = fatalError,
                         attemptMs = System.currentTimeMillis()
                     )
+                    Log.d("NT_E2E_ROOM_RECONCILED", "Room entity localPickupId=${pickup.localPickupId} state=SERVER_REJECTED error=$fatalError")
                     continue
                 }
 
@@ -70,6 +72,7 @@ class PickupSyncWorker(
                         localPickupId = pickup.localPickupId,
                         serverPickupId = serverId
                     )
+                    Log.d("NT_E2E_ROOM_RECONCILED", "Room entity localPickupId=${pickup.localPickupId} state=SERVER_VERIFIED serverPickupId=$serverId")
                     Log.i(TAG, "Pickup ${pickup.localPickupId} authoritatively verified by server: $serverId")
                 } else {
                     val error = syncResult.exceptionOrNull()?.message ?: "Unknown sync error"
@@ -82,6 +85,7 @@ class PickupSyncWorker(
                         errorMsg = error,
                         attemptMs = System.currentTimeMillis()
                     )
+                    Log.d("NT_E2E_ROOM_RECONCILED", "Room entity localPickupId=${pickup.localPickupId} state=$nextState error=$error")
 
                     if (!isFatalRejection) {
                         anyFailed = true
@@ -154,6 +158,7 @@ class PickupSyncWorker(
         if (idToken.isNullOrEmpty()) {
             return kotlin.Result.failure(Exception("UNAUTHORIZED: Acquired Firebase ID token is null or empty."))
         }
+        Log.d("NT_E2E_TOKEN_ACQUIRED", "Acquired valid Firebase ID token for user email=${firebaseUser.email} uid=${firebaseUser.uid}")
 
         val syncEndpoint = "https://ubphrqumpqdifupwbvpe.supabase.co/rest/v1/rpc/process_verified_pickup_transaction_v2"
         val supabaseApiKey = com.nirmaltag.app.BuildConfig.SUPABASE_PUBLISHABLE_KEY
@@ -190,6 +195,8 @@ class PickupSyncWorker(
                 }
             """.trimIndent()
 
+            Log.d("NT_E2E_RPC_REQUEST", "Invoking Supabase RPC process_verified_pickup_transaction_v2 for localPickupId=${pickup.localPickupId} tagSerial=${pickup.tagSerialCode} idempotencyKey=${pickup.idempotencyKey}")
+
             connection.outputStream.use { os ->
                 os.write(payloadJson.toByteArray(Charsets.UTF_8))
             }
@@ -197,9 +204,11 @@ class PickupSyncWorker(
             val statusCode = connection.responseCode
             if (statusCode in 200..299) {
                 val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                Log.d("NT_E2E_RPC_RESPONSE", "RPC HTTP $statusCode Response payload: $responseText")
                 return kotlin.Result.success("SUPABASE-TXN-${pickup.idempotencyKey.take(8)}")
             } else {
                 val errorMsg = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $statusCode"
+                Log.d("NT_E2E_RPC_RESPONSE", "RPC HTTP $statusCode Error payload: $errorMsg")
                 if (statusCode == 401 || statusCode == 403) {
                     return kotlin.Result.failure(Exception("UNAUTHORIZED: Server rejected credentials ($statusCode): $errorMsg"))
                 } else if (statusCode in 400..499) {
