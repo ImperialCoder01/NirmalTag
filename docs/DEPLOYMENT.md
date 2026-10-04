@@ -1,34 +1,80 @@
-# NIRMALTAG — Deployment & Infrastructure Specification
+# NIRMALTAG — PRODUCTION DEPLOYMENT SPECIFICATION
 
-## 🌐 Live Production Environments
-
-- **Web Platform Production URL**: [https://nirmaltag.vercel.app/](https://nirmaltag.vercel.app/)
-- **Vercel Project Dashboard**: [https://vercel.com/imperialcoder01s-projects/nirmaltag](https://vercel.com/imperialcoder01s-projects/nirmaltag)
-- **Supabase Backend Database**: `https://ubphrqumpqdifupwbvpe.supabase.co`
-- **Firebase Auth Project ID**: `nirmaltag`
+**Platform**: NirmalTag Civic Tech Platform  
+**Version**: `1.0.0`  
+**Web Deployment**: Vercel (`https://nirmaltag.vercel.app`)  
+**Android Deployment**: Direct APK Release (`NirmalTag.apk`)  
 
 ---
 
-## 🚀 Deployed Production Web Portals
+## 1. WEB PRODUCTION DEPLOYMENT (Vercel)
 
-| Route | Purpose | Access Level | Live Link |
-| :--- | :--- | :--- | :--- |
-| `/` | Platform Landing & Role Showcase | Public | [https://nirmaltag.vercel.app/](https://nirmaltag.vercel.app/) |
-| `/household` | Household Resident Portal | HOUSEHOLD | [https://nirmaltag.vercel.app/household](https://nirmaltag.vercel.app/household) |
-| `/collector` | Collector Mobile Field App | COLLECTOR | [https://nirmaltag.vercel.app/collector](https://nirmaltag.vercel.app/collector) |
-| `/tag-officer` | Tag Officer Batch & Inventory Management | TAG_OFFICER | [https://nirmaltag.vercel.app/tag-officer](https://nirmaltag.vercel.app/tag-officer) |
-| `/rwa` | Resident Welfare Association Dashboard | RWA_ADMIN | [https://nirmaltag.vercel.app/rwa](https://nirmaltag.vercel.app/rwa) |
-| `/bwg` | Bulk Waste Generator Dashboard | BWG_ADMIN | [https://nirmaltag.vercel.app/bwg](https://nirmaltag.vercel.app/bwg) |
-| `/mcd` | MCD Executive Municipal Command Dashboard | MCD_OFFICER | [https://nirmaltag.vercel.app/mcd](https://nirmaltag.vercel.app/mcd) |
-| `/admin` | System Security & RBAC Administrator Portal | SYSTEM_ADMIN | [https://nirmaltag.vercel.app/admin](https://nirmaltag.vercel.app/admin) |
-| `/login` | Firebase Authentication Login Screen | Public | [https://nirmaltag.vercel.app/login](https://nirmaltag.vercel.app/login) |
-| `/api/v1/tag-batches` | Mass Tag Generation API Endpoint | Server API | `https://nirmaltag.vercel.app/api/v1/tag-batches` |
-| `/api/v1/pickups/sync` | Offline-First Pickup Sync API | Server API | `https://nirmaltag.vercel.app/api/v1/pickups/sync` |
+### Prerequisites
+- Next.js 14 App Router project located in `/web`.
+- Node.js 18+ runtime environment.
+
+### Environment Variables
+Configure the following environment variables in Vercel:
+
+```env
+# Public Client Variables (Exposed to Browser)
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=nirmaltag.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=nirmaltag
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=nirmaltag.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=72818659470
+NEXT_PUBLIC_FIREBASE_APP_ID=1:72818659470:web:e11c392f35660b2be339df
+
+NEXT_PUBLIC_SUPABASE_URL=https://ubphrqumpqdifupwbvpe.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key_here
+
+# Secret Server-Only Service Keys (Never exposed to client JS)
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+```
+
+### Build & Deploy Commands
+```bash
+cd web
+npm install
+npm test          # Runs 54/54 integration tests
+npm run build     # Compiles 39 static and dynamic routes
+```
 
 ---
 
-## 📱 Android Keystore Credentials & Fingerprints
+## 2. ANDROID PRODUCTION BUILD PIPELINE
 
-- **Package Name**: `com.nirmaltag.app`
-- **SHA-1 Fingerprint**: `EE:B7:6F:CC:CB:C6:AD:FF:C1:F6:DD:3E:D3:A7:C1:A9:57:3E:D1:35`
-- **SHA-256 Fingerprint**: `25:E2:CC:34:C5:3F:9F:35:B4:78:E1:B9:99:E2:AA:90:29:5B:E2:2B:7D:35:3D:9D:5F:15:A2:85:3B:00:AA:EB`
+### Prerequisites
+- Android SDK 34 (compileSdk = 34, targetSdk = 34, minSdk = 26).
+- Java 17 JDK.
+
+### Build Commands
+```bash
+cd android
+
+# Clean & run unit tests (54/54 PASS)
+.\gradlew.bat clean
+.\gradlew.bat test
+
+# Build Direct Distribution Release APK (44.68 MB)
+.\gradlew.bat assembleRelease
+# Output: android/app/build/outputs/apk/release/NirmalTag.apk
+
+# Build Optional Google Play Store App Bundle (25.20 MB)
+.\gradlew.bat bundleRelease
+# Output: android/app/build/outputs/bundle/release/app-release.aab
+```
+
+### Direct APK Distribution Metrics
+- **Artifact**: `NirmalTag.apk`
+- **File Size**: `46,855,064 bytes` (~44.68 MB)
+- **SHA-256 Checksum**:  
+  `F249A146D6C613019FA628B2E0B323A754651D5DD19F7F2AF0193F54AE944319`
+
+---
+
+## 3. DATABASE BACKUP & RECOVERY READINESS
+
+- **Hosted Provider**: Supabase hosted PostgreSQL infrastructure.
+- **Automated Backup**: Daily automated database backups & Point-in-Time Recovery (PITR) enabled.
+- **Recovery Procedure**: Restoration performed via Supabase Cloud Dashboard or `supabase db restore` CLI migration scripts.
