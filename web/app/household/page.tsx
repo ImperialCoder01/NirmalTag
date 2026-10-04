@@ -175,12 +175,44 @@ export default function HouseholdPage() {
     }
   };
 
-  const handleRedeemReward = (reward: typeof rewardsList[0]) => {
+  const handleRedeemReward = async (reward: typeof rewardsList[0]) => {
     if (creditBalance < reward.cost) {
       showNotification(`Insufficient credit points! You need ${reward.cost - creditBalance} more points.`, "error");
       return;
     }
-    showNotification(`Redemption request for "${reward.title}" submitted to server. Voucher code will be issued upon ledger verification.`, "success");
+
+    try {
+      const token = await getIdToken();
+      if (!token) {
+        showNotification("Authentication token missing.", "error");
+        return;
+      }
+
+      const res = await fetch("/api/v1/household/redeem-reward", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          rewardItemName: reward.title,
+          creditsSpent: reward.cost,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        showNotification(data.message || "Redemption request failed.", "error");
+        return;
+      }
+
+      showNotification(`Successfully redeemed "${reward.title}"! ${reward.cost} points deducted.`, "success");
+      setIsRedeemOpen(false);
+      await fetchHouseholdData();
+    } catch (err: any) {
+      showNotification(err.message || "Failed to process reward redemption.", "error");
+    }
   };
 
   return (

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateServerRequest } from "@/lib/supabase-auth";
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   try {
     let authResult;
     try {
@@ -15,48 +15,41 @@ export async function POST(request: Request) {
     }
 
     const { supabaseUserClient } = authResult;
+    const { searchParams } = new URL(request.url);
+    const query = searchParams.get("query") || "";
 
-    const body = await request.json().catch(() => ({}));
-    const { tagId, householdId, idempotencyKey } = body;
-
-    if (!tagId || !householdId) {
+    if (!query) {
       return NextResponse.json({
         success: false,
         code: "INVALID_PARAMETERS",
-        message: "tagId and householdId parameters are required.",
+        message: "query parameter is required.",
       }, { status: 400 });
     }
 
-    const activeIdempotencyKey = idempotencyKey || `ASSIGN-${tagId}-${Date.now()}`;
-
-    // Execute PostgreSQL procedure: assign_tag_to_household
-    const { data: dbResult, error: dbError } = await supabaseUserClient.rpc(
-      "assign_tag_to_household",
-      {
-        p_tag_id: tagId,
-        p_household_id: householdId,
-        p_idempotency_key: activeIdempotencyKey,
-      }
-    );
+    const { data: tags, error: dbError } = await supabaseUserClient
+      .from("tags")
+      .select("id, serial_code, canonical_code, status, current_assigned_household_id, created_at, updated_at")
+      .or(`serial_code.ilike.%${query}%,canonical_code.ilike.%${query}%`)
+      .limit(10);
 
     if (dbError) {
       return NextResponse.json({
         success: false,
-        code: "ASSIGNMENT_FAILED",
-        message: `Tag assignment failed: ${dbError.message}`,
+        code: "SEARCH_FAILED",
+        message: `Tag search failed: ${dbError.message}`,
       }, { status: 422 });
     }
 
     return NextResponse.json({
       success: true,
-      code: "TAG_ASSIGNED",
-      result: dbResult,
+      code: "TAGS_FOUND",
+      tags: tags || [],
     });
   } catch (error: any) {
     return NextResponse.json({
       success: false,
       code: "SERVER_ERROR",
-      message: error.message || "Tag assignment failed due to server error.",
+      message: error.message || "Tag search failed due to server error.",
     }, { status: 500 });
   }
 }

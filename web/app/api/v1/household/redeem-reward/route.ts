@@ -17,24 +17,24 @@ export async function POST(request: Request) {
     const { supabaseUserClient } = authResult;
 
     const body = await request.json().catch(() => ({}));
-    const { tagId, householdId, idempotencyKey } = body;
+    const { rewardItemName, creditsSpent, idempotencyKey } = body;
 
-    if (!tagId || !householdId) {
+    if (!rewardItemName || !creditsSpent || creditsSpent <= 0) {
       return NextResponse.json({
         success: false,
         code: "INVALID_PARAMETERS",
-        message: "tagId and householdId parameters are required.",
+        message: "rewardItemName and positive creditsSpent parameters are required.",
       }, { status: 400 });
     }
 
-    const activeIdempotencyKey = idempotencyKey || `ASSIGN-${tagId}-${Date.now()}`;
+    const activeIdempotencyKey = idempotencyKey || `RED-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
-    // Execute PostgreSQL procedure: assign_tag_to_household
+    // Call authoritative PostgreSQL RPC procedure
     const { data: dbResult, error: dbError } = await supabaseUserClient.rpc(
-      "assign_tag_to_household",
+      "redeem_household_credits",
       {
-        p_tag_id: tagId,
-        p_household_id: householdId,
+        p_reward_item_name: rewardItemName,
+        p_credits_spent: creditsSpent,
         p_idempotency_key: activeIdempotencyKey,
       }
     );
@@ -42,21 +42,21 @@ export async function POST(request: Request) {
     if (dbError) {
       return NextResponse.json({
         success: false,
-        code: "ASSIGNMENT_FAILED",
-        message: `Tag assignment failed: ${dbError.message}`,
+        code: "REDEMPTION_FAILED",
+        message: `Reward redemption failed: ${dbError.message}`,
       }, { status: 422 });
     }
 
     return NextResponse.json({
       success: true,
-      code: "TAG_ASSIGNED",
+      code: "REWARD_REDEEMED",
       result: dbResult,
     });
   } catch (error: any) {
     return NextResponse.json({
       success: false,
       code: "SERVER_ERROR",
-      message: error.message || "Tag assignment failed due to server error.",
+      message: error.message || "Reward redemption failed due to server error.",
     }, { status: 500 });
   }
 }

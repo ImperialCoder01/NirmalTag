@@ -17,24 +17,25 @@ export async function POST(request: Request) {
     const { supabaseUserClient } = authResult;
 
     const body = await request.json().catch(() => ({}));
-    const { tagId, householdId, idempotencyKey } = body;
+    const { oldTagId, newTagId, reason, idempotencyKey } = body;
 
-    if (!tagId || !householdId) {
+    if (!oldTagId || !newTagId || !reason) {
       return NextResponse.json({
         success: false,
         code: "INVALID_PARAMETERS",
-        message: "tagId and householdId parameters are required.",
+        message: "oldTagId, newTagId, and reason parameters are required.",
       }, { status: 400 });
     }
 
-    const activeIdempotencyKey = idempotencyKey || `ASSIGN-${tagId}-${Date.now()}`;
+    const activeIdempotencyKey = idempotencyKey || `REPLACE-${oldTagId}-${Date.now()}`;
 
-    // Execute PostgreSQL procedure: assign_tag_to_household
+    // Execute PostgreSQL procedure: replace_damaged_or_lost_tag
     const { data: dbResult, error: dbError } = await supabaseUserClient.rpc(
-      "assign_tag_to_household",
+      "replace_damaged_or_lost_tag",
       {
-        p_tag_id: tagId,
-        p_household_id: householdId,
+        p_old_tag_id: oldTagId,
+        p_new_tag_id: newTagId,
+        p_reason: reason,
         p_idempotency_key: activeIdempotencyKey,
       }
     );
@@ -42,21 +43,21 @@ export async function POST(request: Request) {
     if (dbError) {
       return NextResponse.json({
         success: false,
-        code: "ASSIGNMENT_FAILED",
-        message: `Tag assignment failed: ${dbError.message}`,
+        code: "REPLACEMENT_FAILED",
+        message: `Tag replacement failed: ${dbError.message}`,
       }, { status: 422 });
     }
 
     return NextResponse.json({
       success: true,
-      code: "TAG_ASSIGNED",
+      code: "TAG_REPLACED",
       result: dbResult,
     });
   } catch (error: any) {
     return NextResponse.json({
       success: false,
       code: "SERVER_ERROR",
-      message: error.message || "Tag assignment failed due to server error.",
+      message: error.message || "Tag replacement failed due to server error.",
     }, { status: 500 });
   }
 }

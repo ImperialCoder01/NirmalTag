@@ -15,48 +15,44 @@ export async function POST(request: Request) {
     }
 
     const { supabaseUserClient } = authResult;
-
     const body = await request.json().catch(() => ({}));
-    const { tagId, householdId, idempotencyKey } = body;
+    const { targetProfileId, roleName } = body;
 
-    if (!tagId || !householdId) {
+    if (!targetProfileId || !roleName) {
       return NextResponse.json({
         success: false,
         code: "INVALID_PARAMETERS",
-        message: "tagId and householdId parameters are required.",
+        message: "targetProfileId and roleName parameters are required.",
       }, { status: 400 });
     }
 
-    const activeIdempotencyKey = idempotencyKey || `ASSIGN-${tagId}-${Date.now()}`;
-
-    // Execute PostgreSQL procedure: assign_tag_to_household
+    // Call PostgreSQL assign_user_role procedure
     const { data: dbResult, error: dbError } = await supabaseUserClient.rpc(
-      "assign_tag_to_household",
+      "assign_user_role",
       {
-        p_tag_id: tagId,
-        p_household_id: householdId,
-        p_idempotency_key: activeIdempotencyKey,
+        p_target_profile_id: targetProfileId,
+        p_role_name: roleName,
       }
     );
 
     if (dbError) {
       return NextResponse.json({
         success: false,
-        code: "ASSIGNMENT_FAILED",
-        message: `Tag assignment failed: ${dbError.message}`,
+        code: "PROVISIONING_FAILED",
+        message: `Role provisioning failed: ${dbError.message}`,
       }, { status: 422 });
     }
 
     return NextResponse.json({
       success: true,
-      code: "TAG_ASSIGNED",
+      code: "ROLE_PROVISIONED",
       result: dbResult,
     });
   } catch (error: any) {
     return NextResponse.json({
       success: false,
       code: "SERVER_ERROR",
-      message: error.message || "Tag assignment failed due to server error.",
+      message: error.message || "Role provisioning failed due to server error.",
     }, { status: 500 });
   }
 }

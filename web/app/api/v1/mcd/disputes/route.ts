@@ -15,48 +15,47 @@ export async function POST(request: Request) {
     }
 
     const { supabaseUserClient } = authResult;
-
     const body = await request.json().catch(() => ({}));
-    const { tagId, householdId, idempotencyKey } = body;
+    const { disputeId, action, reviewNotes } = body;
 
-    if (!tagId || !householdId) {
+    if (!disputeId || !action || (action !== "APPROVE" && action !== "REJECT")) {
       return NextResponse.json({
         success: false,
         code: "INVALID_PARAMETERS",
-        message: "tagId and householdId parameters are required.",
+        message: "disputeId and valid action (APPROVE/REJECT) parameters are required.",
       }, { status: 400 });
     }
 
-    const activeIdempotencyKey = idempotencyKey || `ASSIGN-${tagId}-${Date.now()}`;
-
-    // Execute PostgreSQL procedure: assign_tag_to_household
-    const { data: dbResult, error: dbError } = await supabaseUserClient.rpc(
-      "assign_tag_to_household",
-      {
-        p_tag_id: tagId,
-        p_household_id: householdId,
-        p_idempotency_key: activeIdempotencyKey,
-      }
-    );
+    // Insert verification review record in PostgreSQL
+    const { data: review, error: dbError } = await supabaseUserClient
+      .from("verification_reviews")
+      .insert({
+        pickup_id: disputeId,
+        previous_status: "PENDING",
+        final_status: action === "APPROVE" ? "VERIFIED" : "REJECTED",
+        review_notes: reviewNotes || `Dispute ${action.toLowerCase()}d by MCD Officer.`,
+      })
+      .select("*")
+      .single();
 
     if (dbError) {
       return NextResponse.json({
         success: false,
-        code: "ASSIGNMENT_FAILED",
-        message: `Tag assignment failed: ${dbError.message}`,
+        code: "REVIEW_FAILED",
+        message: `Failed to record dispute review: ${dbError.message}`,
       }, { status: 422 });
     }
 
     return NextResponse.json({
       success: true,
-      code: "TAG_ASSIGNED",
-      result: dbResult,
+      code: "DISPUTE_RESOLVED",
+      review,
     });
   } catch (error: any) {
     return NextResponse.json({
       success: false,
       code: "SERVER_ERROR",
-      message: error.message || "Tag assignment failed due to server error.",
+      message: error.message || "Failed to resolve dispute due to server error.",
     }, { status: 500 });
   }
 }
