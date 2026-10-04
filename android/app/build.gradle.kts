@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.io.File
 
 plugins {
     id("com.android.application")
@@ -25,18 +26,32 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        val collectorTestEmail = localProps.getProperty("collector.test.email", "")
-        val collectorTestPassword = localProps.getProperty("collector.test.password", "")
-
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
-        buildConfigField("String", "COLLECTOR_TEST_EMAIL", "\"$collectorTestEmail\"")
-        buildConfigField("String", "COLLECTOR_TEST_PASSWORD", "\"$collectorTestPassword\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
     }
+
+    val keystorePath = System.getenv("NIRMALTAG_KEYSTORE_PATH") ?: localProps.getProperty("release.keystore.path", "")
+    val keystorePassword = System.getenv("NIRMALTAG_KEYSTORE_PASSWORD") ?: localProps.getProperty("release.keystore.password", "")
+    val keyAlias = System.getenv("NIRMALTAG_KEY_ALIAS") ?: localProps.getProperty("release.key.alias", "")
+    val keyPassword = System.getenv("NIRMALTAG_KEY_PASSWORD") ?: localProps.getProperty("release.key.password", "")
+
+    val hasReleaseSigning = keystorePath.isNotEmpty() && File(keystorePath).exists() && keystorePassword.isNotEmpty()
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = File(keystorePath)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
+    }
+
 
     applicationVariants.all {
         outputs.all {
@@ -46,14 +61,28 @@ android {
     }
 
     buildTypes {
+        debug {
+            val collectorTestEmail = localProps.getProperty("collector.test.email", "")
+            val collectorTestPassword = localProps.getProperty("collector.test.password", "")
+            buildConfigField("String", "COLLECTOR_TEST_EMAIL", "\"$collectorTestEmail\"")
+            buildConfigField("String", "COLLECTOR_TEST_PASSWORD", "\"$collectorTestPassword\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
+            buildConfigField("String", "COLLECTOR_TEST_EMAIL", "\"\"")
+            buildConfigField("String", "COLLECTOR_TEST_PASSWORD", "\"\"")
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
