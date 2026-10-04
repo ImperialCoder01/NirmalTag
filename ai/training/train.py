@@ -95,15 +95,15 @@ def collect_image_paths(dataset_root: Path) -> dict[str, list[Path]]:
 
 def check_dataset_minimum(image_map: dict[str, list[Path]]) -> bool:
     """Returns True if all classes meet the minimum image requirement."""
-    print("\n── Dataset Inventory ──────────────────────────────────────────")
+    print("\n-- Dataset Inventory --------------------------------------------------")
     all_ok = True
     for cls in CLASSES:
         count = len(image_map.get(cls, []))
-        status = "✓" if count >= MIN_IMAGES_PER_CLASS else "✗ INSUFFICIENT"
-        print(f"  {status}  {cls}: {count} images (min: {MIN_IMAGES_PER_CLASS})")
+        status = "OK" if count >= MIN_IMAGES_PER_CLASS else "INSUFFICIENT"
+        print(f"  {status:12s}  {cls}: {count} images (min: {MIN_IMAGES_PER_CLASS})")
         if count < MIN_IMAGES_PER_CLASS:
             all_ok = False
-    print("──────────────────────────────────────────────────────────────")
+    print("----------------------------------------------------------------------")
     return all_ok
 
 
