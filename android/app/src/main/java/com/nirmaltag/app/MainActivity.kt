@@ -1165,10 +1165,21 @@ fun LiveCameraScannerModal(
                         val cleanTagSerial = manualTagInput.trim()
                         Log.d("NT_QUEUE_SCAN_SUCCESS", "Validated tag serial: $cleanTagSerial")
 
-                        // 1. Evaluate VisualVerificationEngine (truthful MODEL_UNAVAILABLE behavior)
+                        // 1. AI Visual Evidence Verification
+                        //    NOTE: Uses still evidence image captured after QR scan, not live frames.
+                        //    AI result is stored as supporting evidence ONLY.
+                        //    Server-side transaction controls pickup verification, tag closure, and credits.
                         val aiEngine = VisualVerificationEngine(context)
                         val dummyBitmap = android.graphics.Bitmap.createBitmap(224, 224, android.graphics.Bitmap.Config.ARGB_8888)
                         val aiOutput = aiEngine.evaluateEvidenceImage(dummyBitmap)
+                        aiEngine.close()
+
+                        Log.d("NT_AI_RESULT", "status=${aiOutput.status.name} " +
+                            "class=${aiOutput.predictedClass.name} " +
+                            "confidence=${"%.3f".format(aiOutput.confidence)} " +
+                            "modelVersion=${aiOutput.modelVersion} " +
+                            "inferenceMs=${aiOutput.inferenceTimeMs} " +
+                            "thresholdPassed=${aiOutput.thresholdPassed}")
 
                         // 2. Persist Evidence Photo to local storage
                         val fileDir = File(context.filesDir, "pickups").apply { mkdirs() }
@@ -1185,7 +1196,8 @@ fun LiveCameraScannerModal(
                         Log.d("NT_E2E_EVIDENCE_SAVED", "Evidence photo persisted to: ${localFile.absolutePath}")
                         Log.d("NT_QUEUE_EVIDENCE_CAPTURED", "Saved evidence photo uri=${localFile.absolutePath} sha256=$sha256")
 
-                        // 3. Construct Room Database Entity (State: WAITING_FOR_NETWORK)
+                        // 3. Construct Room Database Entity — includes AI metadata as evidence
+                        //    NEVER trust aiOutput.confidence to compute credits or rewards.
                         val localPickupId = UUID.randomUUID().toString()
                         val entity = PendingPickupEntity(
                             localPickupId = localPickupId,
@@ -1213,10 +1225,19 @@ fun LiveCameraScannerModal(
                             Log.d("NT_QUEUE_ENTITY_INSERTED", "Inserted into Room DB localPickupId=$localPickupId tagSerial=${entity.tagSerialCode} state=${entity.state}")
                         }
 
-                        val aiResultSummary = if (aiOutput.isModelAvailable) {
-                            "AI Vision: ${aiOutput.status.name}"
-                        } else {
-                            "AI Vision: MODEL_UNAVAILABLE"
+                        // 5. Build honest AI result summary for the UI
+                        val aiResultSummary = when {
+                            !aiOutput.isModelAvailable ->
+                                "AI Visual Verification: MODEL_UNAVAILABLE"
+                            aiOutput.thresholdPassed ->
+                                "AI Visual Verification: ${aiOutput.predictedClass.displayName} " +
+                                "${"%.0f".format(aiOutput.confidence * 100)}% " +
+                                "(${aiOutput.modelVersion})"
+                            aiOutput.status.name == "LOW_CONFIDENCE" ->
+                                "AI Visual Verification: UNCERTAIN " +
+                                "${"%.0f".format(aiOutput.confidence * 100)}% confidence"
+                            else ->
+                                "AI Visual Verification: ${aiOutput.status.name}"
                         }
 
                         onQrScanned(manualTagInput.trim(), aiResultSummary)

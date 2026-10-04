@@ -1,0 +1,30 @@
+# NirmalTag AI Training — Requirements
+
+# Core ML (CPU PyTorch is sufficient for training on small datasets)
+# GPU version: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Data processing
+Pillow>=9.0.0
+numpy>=1.24.0
+
+# Metrics
+scikit-learn>=1.3.0
+
+# Progress display
+tqdm>=4.65.0
+
+# ONNX export
+onnx>=1.14.0
+
+# TFLite conversion (required for export_tflite.py)
+# Large package (~500MB), install separately when needed:
+# tensorflow>=2.13.0
+# onnx-tf>=1.10.0
+
+# EXIF stripping (for dataset privacy)
+piexif>=1.1.3
+
+# TFLite runtime (lighter alternative for validate.py)
+# tflite-runtime>=2.13.0
