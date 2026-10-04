@@ -16,7 +16,10 @@ DECLARE
     v_category_id UUID;
     v_category_code TEXT;
     v_tag_id UUID;
+    v_existing_status VARCHAR(50);
+    v_existing_household_id UUID;
     v_final_tag_code TEXT;
+    v_current_pouch_status VARCHAR(50);
 BEGIN
     -- 1. Identity & Role Verification
     v_actor_profile_id := get_authenticated_profile_id();
@@ -26,11 +29,11 @@ BEGIN
 
     SELECT role INTO v_actor_role FROM user_roles WHERE user_id = v_actor_profile_id LIMIT 1;
     IF v_actor_role NOT IN ('COLLECTOR', 'TAG_OFFICER', 'RWA_ADMIN', 'SYSTEM_ADMIN') THEN
-        RAISE EXCEPTION 'Access Denied: Role % is not authorized to fulfill pouch orders.', v_actor_role USING ERRCODE = '42501';
+        RAISE EXCEPTION 'Access Denied: Role % is not authorized to fulfill pouch orders.', COALESCE(v_actor_role, 'UNKNOWN') USING ERRCODE = '42501';
     END IF;
 
     -- 2. Retrieve Pouch Request Record
-    SELECT household_id, waste_category_id INTO v_household_id, v_category_id
+    SELECT household_id, waste_category_id, status INTO v_household_id, v_category_id, v_current_pouch_status
     FROM pouch_requests
     WHERE id = p_request_id;
 
@@ -38,15 +41,43 @@ BEGIN
         RAISE EXCEPTION 'Pouch Request Not Found: %', p_request_id USING ERRCODE = '22023';
     END IF;
 
+    -- Idempotency check: if already DELIVERED, return success cleanly without re-executing mutations
+    IF v_current_pouch_status = 'DELIVERED' THEN
+        SELECT canonical_code INTO v_final_tag_code
+        FROM tags t
+        JOIN pouch_requests pr ON t.id = ANY(pr.allocated_tag_ids)
+        WHERE pr.id = p_request_id LIMIT 1;
+
+        RETURN jsonb_build_object(
+            'success', true,
+            'requestId', p_request_id,
+            'status', 'DELIVERED',
+            'allocatedTagCode', v_final_tag_code,
+            'message', 'Pouch request was already fulfilled (idempotent).'
+        );
+    END IF;
+
     SELECT user_id INTO v_resident_profile_id FROM households WHERE id = v_household_id;
     SELECT code INTO v_category_code FROM waste_categories WHERE id = v_category_id;
 
-    -- 3. Tag Allocation / Binding
+    -- 3. Tag Allocation & Eligibility Checks
     IF p_tag_code IS NOT NULL AND p_tag_code <> '' THEN
         v_final_tag_code := UPPER(TRIM(p_tag_code));
 
-        SELECT id INTO v_tag_id FROM tags WHERE canonical_code = v_final_tag_code;
+        SELECT id, status, current_assigned_household_id INTO v_tag_id, v_existing_status, v_existing_household_id 
+        FROM tags WHERE canonical_code = v_final_tag_code;
+
         IF v_tag_id IS NOT NULL THEN
+            -- Invariant Rule: Rejects CLOSED, ACTIVE, INVALIDATED, or LOST tags
+            IF v_existing_status IN ('CLOSED', 'ACTIVE', 'INVALIDATED', 'LOST') THEN
+                RAISE EXCEPTION 'Invalid Tag State: Tag % is in % status and cannot be reassigned.', v_final_tag_code, v_existing_status USING ERRCODE = '22023';
+            END IF;
+
+            -- Invariant Rule: Rejects tag already assigned to another household
+            IF v_existing_household_id IS NOT NULL AND v_existing_household_id <> v_household_id THEN
+                RAISE EXCEPTION 'Household Mismatch: Tag % is assigned to another household.', v_final_tag_code USING ERRCODE = '22023';
+            END IF;
+
             UPDATE tags
             SET status = 'ASSIGNED',
                 current_assigned_household_id = v_household_id,
