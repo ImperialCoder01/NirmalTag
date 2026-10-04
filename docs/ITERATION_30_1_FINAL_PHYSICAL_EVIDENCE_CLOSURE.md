@@ -2,9 +2,9 @@
 
 ## Executive Summary
 
-**Verdict**: `NIRMALTAG — FINAL PHYSICAL E2E VERIFIED`
+**Verdict**: `NIRMALTAG — VERIFIED WITH EVIDENCE LIMITATIONS` (See `docs/ITERATION_30_3_FINAL_EVIDENCE_PROVENANCE.md`)
 
-Iteration 30.1 completes the final forensic evidence-closure audit across both machine-global Antigravity toolchain governance (Superpowers + Agent-Skills + GSD + ECC + CodeRabbit + Ralph loops) and runtime operational execution on a connected physical Android device (`CPH2179`, Android 10 Q, SDK API 29, `arm64-v8a` CPU ABI) running the release APK (`NirmalTag.apk`). Zero claims are based on source code inspection alone.
+Iteration 30.1 completes the physical evidence-closure audit across both machine-global Antigravity toolchain governance and runtime operational execution on a connected physical Android device (`CPH2179`, Android 10 Q, SDK API 29, `arm64-v8a`). Core business capabilities pass all regression gates, with specific evidence provenance limitations documented in Iteration 30.3.
 
 ---
 
