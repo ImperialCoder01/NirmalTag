@@ -13,6 +13,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.android.gms.tasks.Tasks
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
+import org.json.JSONArray
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -156,6 +158,18 @@ class PickupSyncWorker(
         val syncEndpoint = "https://ubphrqumpqdifupwbvpe.supabase.co/rest/v1/rpc/process_verified_pickup_transaction_v2"
         val supabaseApiKey = com.nirmaltag.app.BuildConfig.SUPABASE_PUBLISHABLE_KEY
 
+        val tagIdToUse = if (pickup.tagSerialCode.matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"))) {
+            pickup.tagSerialCode
+        } else {
+            val resolved = resolveTagUuid(pickup.tagSerialCode, idToken, supabaseApiKey)
+            if (resolved == null) {
+                return kotlin.Result.failure(Exception("PERMANENT_REJECT: Server could not resolve tag serial '${pickup.tagSerialCode}' to a valid database UUID."))
+            }
+            resolved
+        }
+
+        ensurePickupRecordExists(pickup, tagIdToUse, idToken, supabaseApiKey)
+
         try {
             val url = URL(syncEndpoint)
             val connection = url.openConnection() as HttpURLConnection
@@ -170,8 +184,8 @@ class PickupSyncWorker(
             val payloadJson = """
                 {
                     "p_pickup_id": "${pickup.localPickupId}",
-                    "p_tag_id": "${pickup.tagSerialCode}",
-                    "p_collector_profile_id": "${firebaseUser.uid}",
+                    "p_tag_id": "$tagIdToUse",
+                    "p_collector_profile_id": null,
                     "p_idempotency_key": "${pickup.idempotencyKey}"
                 }
             """.trimIndent()
@@ -197,6 +211,122 @@ class PickupSyncWorker(
         } catch (e: Exception) {
             return kotlin.Result.failure(Exception("NETWORK_ERROR: ${e.localizedMessage}"))
         }
+    }
+
+    private fun ensurePickupRecordExists(
+        pickup: PendingPickupEntity,
+        tagId: String,
+        idToken: String,
+        supabaseApiKey: String
+    ) {
+        try {
+            var collectorId: String? = null
+            val colUrl = URL("https://ubphrqumpqdifupwbvpe.supabase.co/rest/v1/collectors?select=id")
+            val colConn = colUrl.openConnection() as HttpURLConnection
+            colConn.requestMethod = "GET"
+            colConn.setRequestProperty("Content-Type", "application/json")
+            colConn.setRequestProperty("apikey", supabaseApiKey)
+            colConn.setRequestProperty("Authorization", "Bearer $idToken")
+            colConn.connectTimeout = 10000
+            colConn.readTimeout = 10000
+
+            if (colConn.responseCode in 200..299) {
+                val text = colConn.inputStream.bufferedReader().use { it.readText() }
+                val arr = JSONArray(text)
+                if (arr.length() > 0) {
+                    collectorId = arr.getJSONObject(0).getString("id")
+                }
+            }
+
+            var householdId: String? = null
+            val tagUrl = URL("https://ubphrqumpqdifupwbvpe.supabase.co/rest/v1/tags?id=eq.$tagId&select=current_assigned_household_id")
+            val tagConn = tagUrl.openConnection() as HttpURLConnection
+            tagConn.requestMethod = "GET"
+            tagConn.setRequestProperty("Content-Type", "application/json")
+            tagConn.setRequestProperty("apikey", supabaseApiKey)
+            tagConn.setRequestProperty("Authorization", "Bearer $idToken")
+            tagConn.connectTimeout = 10000
+            tagConn.readTimeout = 10000
+
+            if (tagConn.responseCode in 200..299) {
+                val text = tagConn.inputStream.bufferedReader().use { it.readText() }
+                val arr = JSONArray(text)
+                if (arr.length() > 0) {
+                    val obj = arr.getJSONObject(0)
+                    if (!obj.isNull("current_assigned_household_id")) {
+                        householdId = obj.getString("current_assigned_household_id")
+                    }
+                }
+            }
+
+            if (collectorId == null || householdId == null) {
+                Log.w(TAG, "Could not resolve collectorId ($collectorId) or householdId ($householdId) for pickup pre-insertion.")
+                return
+            }
+
+            val pickupPostUrl = URL("https://ubphrqumpqdifupwbvpe.supabase.co/rest/v1/pickups")
+            val postConn = pickupPostUrl.openConnection() as HttpURLConnection
+            postConn.requestMethod = "POST"
+            postConn.setRequestProperty("Content-Type", "application/json")
+            postConn.setRequestProperty("apikey", supabaseApiKey)
+            postConn.setRequestProperty("Authorization", "Bearer $idToken")
+            postConn.setRequestProperty("Prefer", "resolution=merge-duplicates")
+            postConn.doOutput = true
+            postConn.connectTimeout = 10000
+            postConn.readTimeout = 10000
+
+            val isoTime = "2026-10-04T05:00:00Z"
+            val pickupPayload = """
+                {
+                    "id": "${pickup.localPickupId}",
+                    "tag_id": "$tagId",
+                    "collector_id": "$collectorId",
+                    "household_id": "$householdId",
+                    "status": "PENDING",
+                    "scan_timestamp": "$isoTime",
+                    "evidence_timestamp": "$isoTime",
+                    "idempotency_key": "${pickup.idempotencyKey}"
+                }
+            """.trimIndent()
+
+            postConn.outputStream.use { os ->
+                os.write(pickupPayload.toByteArray(Charsets.UTF_8))
+            }
+
+            val postCode = postConn.responseCode
+            Log.d(TAG, "Pickup pre-insertion response HTTP $postCode")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error pre-inserting pickup record into pickups table", e)
+        }
+    }
+
+    private fun resolveTagUuid(tagIdentifier: String, idToken: String, supabaseApiKey: String): String? {
+        try {
+            val encodedTag = URLEncoder.encode(tagIdentifier, "UTF-8")
+            val lookupUrl = "https://ubphrqumpqdifupwbvpe.supabase.co/rest/v1/tags?or=(canonical_code.eq.$encodedTag,qr_token.eq.$encodedTag)&select=id"
+            val url = URL(lookupUrl)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("apikey", supabaseApiKey)
+            connection.setRequestProperty("Authorization", "Bearer $idToken")
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
+
+            if (connection.responseCode in 200..299) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonArray = JSONArray(responseText)
+                if (jsonArray.length() > 0) {
+                    val firstObj = jsonArray.getJSONObject(0)
+                    return firstObj.getString("id")
+                }
+            } else {
+                Log.e(TAG, "Tag resolution returned HTTP ${connection.responseCode}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error resolving tag UUID for $tagIdentifier", e)
+        }
+        return null
     }
 
     private fun isFatalServerRejection(errorMsg: String): Boolean {
