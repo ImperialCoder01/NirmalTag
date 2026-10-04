@@ -38,12 +38,16 @@ export async function GET(request: Request) {
       .from("collectors")
       .select("id", { count: "exact", head: true });
 
+    const activeTotalPickups = totalPickups || 0;
+    const activeVerifiedPickups = verifiedPickups || 0;
+    const activeRate = activeTotalPickups > 0 ? Math.round((activeVerifiedPickups / activeTotalPickups) * 100) : 100;
+
     const wardStats = [
-      { ward: "Ward 41", pickups: 4200, verified: 3950, rate: 94 },
-      { ward: "Ward 42", pickups: totalPickups || 5800, verified: verifiedPickups || 5600, rate: 96 },
-      { ward: "Ward 43", pickups: 3100, verified: 2850, rate: 92 },
-      { ward: "Ward 44", pickups: 4900, verified: 4500, rate: 91 },
-      { ward: "Ward 45", pickups: 6200, verified: 6050, rate: 97 },
+      { ward: "Ward 42 (Active)", pickups: activeTotalPickups, verified: activeVerifiedPickups, rate: activeRate },
+      { ward: "Ward 41 (Synthetic)", pickups: 420, verified: 395, rate: 94 },
+      { ward: "Ward 43 (Synthetic)", pickups: 310, verified: 285, rate: 92 },
+      { ward: "Ward 44 (Synthetic)", pickups: 490, verified: 450, rate: 91 },
+      { ward: "Ward 45 (Synthetic)", pickups: 620, verified: 605, rate: 97 },
     ];
 
     return NextResponse.json({
