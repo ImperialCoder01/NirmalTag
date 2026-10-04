@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 - **Authentication**: Native Firebase Email/Password & Google Sign-In with Android Credential Manager & Web SDK. Added multi-account Google switching on physical Android devices.
+- **Real Camera Evidence Capture**: Verified complete optical physical camera pipeline on physical Android hardware (CameraX frame -> Bitmap JPEG -> magic bytes `FF D8 FF` -> SHA-256 raw byte hash verification -> Room DB -> WorkManager -> Supabase double-entry transaction).
 - **7 Canonical User Roles**: Implemented complete functionality for `HOUSEHOLD`, `COLLECTOR`, `TAG_OFFICER`, `RWA_ADMIN`, `BWG_ADMIN`, `MCD_OFFICER`, and `SYSTEM_ADMIN`.
 - **Collector Android App**: Native Kotlin app featuring CameraX, ML Kit Barcode Scanning, Room local DB offline queue (`WAITING_FOR_NETWORK`), and WorkManager sync (`PickupSyncWorker`).
 - **PostgreSQL Backend & Identity Bridge**: Hosted Supabase database with RLS policies mapping Firebase UIDs (`auth.jwt() -> 'sub'`). Added RPC procedures (`pickup_transaction_rpc`, `activate_household_tag`, `redeem_household_credits`, `create_tag_batch_and_records`, `assign_tag_to_household`, `replace_damaged_or_lost_tag`, `assign_user_role`).
