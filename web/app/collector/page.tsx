@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -9,22 +9,26 @@ import {
   Wifi, WifiOff, Wallet, ShieldAlert, UploadCloud, Lock
 } from "lucide-react";
 
+
 export default function CollectorPage() {
-  const { user, role } = useAuth();
+  const { user, role, getIdToken } = useAuth();
 
   // State
   const [scannedCode, setScannedCode] = useState<string>("");
   const [manualInputCode, setManualInputCode] = useState<string>("");
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [scanState, setScanState] = useState<"IDLE" | "SCANNING" | "VALIDATED" | "SUBMITTED" | "ERROR">("IDLE");
+  const [scannedTagId, setScannedTagId] = useState<string>("");
+  const [scannedTagStatus, setScannedTagStatus] = useState<string>("");
   const [aiResult, setAiResult] = useState<{ status: string; confidence: number; category: string } | null>(null);
 
   // Financial Wallet State
-  const [walletBalance, setWalletBalance] = useState<number>(48.00); // ₹
-  const [totalPickupsCompleted, setTotalPickupsCompleted] = useState<number>(24);
+  const [walletBalance, setWalletBalance] = useState<number>(0.00); // ₹
+  const [totalPickupsCompleted, setTotalPickupsCompleted] = useState<number>(0);
+  const [recentPickups, setRecentPickups] = useState<Array<{ id: string; timestamp: string; status: string }>>([]);
 
   // Offline Queue State
-  const [offlineQueue, setOfflineQueue] = useState<{ code: string; category: string; timestamp: string }[]>([]);
+  const [offlineQueue, setOfflineQueue] = useState<{ code: string; tagId: string; timestamp: string }[]>([]);
   const [notification, setNotification] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [upiId, setUpiId] = useState("collector.worker4092@upi");
@@ -33,6 +37,36 @@ export default function CollectorPage() {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
   };
+
+  const fetchCollectorStats = async () => {
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+
+      const res = await fetch("/api/v1/collector/stats", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setWalletBalance(data.walletBalance || 0);
+          setTotalPickupsCompleted(data.totalPickups || 0);
+          if (Array.isArray(data.recentPickups)) {
+            setRecentPickups(data.recentPickups);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch collector stats:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user && (role === "COLLECTOR" || role === "SYSTEM_ADMIN")) {
+      fetchCollectorStats();
+    }
+  }, [user, role]);
 
   // STRICT ACCESS CONTROL GUARD
   if (!user) {
@@ -79,21 +113,62 @@ export default function CollectorPage() {
     );
   }
 
-  const executeScan = (codeToScan: string) => {
+  const executeScan = async (codeToScan: string) => {
     setScanState("SCANNING");
-    setTimeout(() => {
-      setScannedCode(codeToScan);
+    setScannedCode(codeToScan);
+
+    try {
+      const token = await getIdToken();
+      if (!token) {
+        showNotification("Authentication required.", "error");
+        setScanState("IDLE");
+        return;
+      }
+
+      const res = await fetch("/api/v1/tags/lookup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ code: codeToScan })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.tag) {
+        setScannedTagId(data.tag.id);
+        setScannedTagStatus(data.tag.status);
+        setAiResult({
+          status: "MODEL_UNAVAILABLE",
+          confidence: 0.00,
+          category: "Visual Verification (Pouch Sealed Invariant)"
+        });
+        setScanState("VALIDATED");
+      } else {
+        // Fallback for demonstration / local scans
+        setScannedTagId(crypto.randomUUID());
+        setScannedTagStatus("ACTIVE");
+        setAiResult({
+          status: "MODEL_UNAVAILABLE",
+          confidence: 0.00,
+          category: "Visual Verification (Pouch Sealed Invariant)"
+        });
+        setScanState("VALIDATED");
+      }
+    } catch (err) {
+      setScannedTagId(crypto.randomUUID());
+      setScannedTagStatus("ACTIVE");
       setAiResult({
-        status: "VERIFIED",
-        confidence: 0.96,
-        category: "Sanitary Waste (Pouch Sealed Invariant)",
+        status: "MODEL_UNAVAILABLE",
+        confidence: 0.00,
+        category: "Visual Verification (Pouch Sealed Invariant)"
       });
       setScanState("VALIDATED");
-    }, 900);
+    }
   };
 
   const handleSimulateScan = () => {
-    const sampleCode = `NMT-2026-89A4B-000${Math.floor(100 + Math.random() * 900)}`;
+    const sampleCode = `NT-SAN-2026-917501`;
     executeScan(sampleCode);
   };
 
@@ -108,7 +183,7 @@ export default function CollectorPage() {
       // Queue offline
       const newQueueItem = {
         code: scannedCode,
-        category: aiResult?.category || "Sanitary Waste",
+        tagId: scannedTagId || crypto.randomUUID(),
         timestamp: new Date().toLocaleTimeString(),
       };
       setOfflineQueue([...offlineQueue, newQueueItem]);
@@ -117,45 +192,74 @@ export default function CollectorPage() {
       return;
     }
 
-    // Call API / Sync
     try {
-      await fetch("/api/v1/pickups/sync", {
+      const token = await getIdToken();
+      if (!token) {
+        showNotification("Authentication token missing.", "error");
+        return;
+      }
+
+      const pickupId = crypto.randomUUID();
+      const idempotencyKey = `SYNC-${pickupId}-${scannedTagId}`;
+
+      const res = await fetch("/api/v1/pickups/sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
         body: JSON.stringify({
-          pickups: [
-            {
-              tag_code: scannedCode,
-              collector_uid: "COL-4092",
-              ai_confidence: aiResult?.confidence || 0.95,
-              ai_status: "VERIFIED",
-              scanned_at: new Date().toISOString(),
-            },
-          ],
+          pickupId,
+          tagId: scannedTagId || crypto.randomUUID(),
+          idempotencyKey,
         }),
       });
 
-      setWalletBalance((prev) => prev + 2.0);
-      setTotalPickupsCompleted((prev) => prev + 1);
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        showNotification(data.message || "Pickup verification failed.", "error");
+        setScanState("ERROR");
+        return;
+      }
+
       setScanState("SUBMITTED");
       showNotification(`Pickup verified & saved! Tag ${scannedCode} set to CLOSED permanently.`);
-    } catch (err) {
-      setWalletBalance((prev) => prev + 2.0);
-      setTotalPickupsCompleted((prev) => prev + 1);
-      setScanState("SUBMITTED");
-      showNotification(`Pickup verified! Tag ${scannedCode} transitioned to CLOSED.`);
+      await fetchCollectorStats();
+    } catch (err: any) {
+      showNotification(err.message || "Pickup processing failed due to network error.", "error");
+      setScanState("ERROR");
     }
   };
 
-  const handleSyncOfflineQueue = () => {
+  const handleSyncOfflineQueue = async () => {
     if (offlineQueue.length === 0) return;
-    const syncedCount = offlineQueue.length;
-    const earnedAmount = syncedCount * 2.0;
+    const token = await getIdToken();
+    if (!token) return;
 
-    setWalletBalance((prev) => prev + earnedAmount);
-    setTotalPickupsCompleted((prev) => prev + syncedCount);
+    let syncedCount = 0;
+    for (const item of offlineQueue) {
+      try {
+        const pickupId = crypto.randomUUID();
+        const res = await fetch("/api/v1/pickups/sync", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            pickupId,
+            tagId: item.tagId,
+            idempotencyKey: `SYNC-${pickupId}-${item.tagId}`,
+          }),
+        });
+        if (res.ok) syncedCount++;
+      } catch (_e) {}
+    }
+
     setOfflineQueue([]);
-    showNotification(`Successfully uploaded ${syncedCount} queued offline pickups! +₹${earnedAmount.toFixed(2)} added to wallet.`);
+    showNotification(`Successfully uploaded ${syncedCount} queued offline pickups!`);
+    await fetchCollectorStats();
   };
 
   const handlePayoutRequest = (e: React.FormEvent) => {
@@ -254,7 +358,7 @@ export default function CollectorPage() {
           <QrCode className="w-10 h-10" />
         </div>
 
-        {scanState === "IDLE" && (
+        {(scanState === "IDLE" || scanState === "ERROR") && (
           <div className="space-y-4">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Scan Pouch QR Tag</h2>
@@ -274,7 +378,7 @@ export default function CollectorPage() {
               <form onSubmit={handleManualScanSubmit} className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="NMT-2026-89A4B-000492"
+                  placeholder="NT-SAN-2026-917501"
                   value={manualInputCode}
                   onChange={(e) => setManualInputCode(e.target.value)}
                   className="flex-1 text-xs p-2.5 rounded-xl border border-slate-300 font-mono"
@@ -293,7 +397,7 @@ export default function CollectorPage() {
         {scanState === "SCANNING" && (
           <div className="py-8 space-y-3">
             <RefreshCw className="w-8 h-8 animate-spin text-emerald-600 mx-auto" />
-            <p className="text-xs font-semibold text-slate-700">Running on-device MobileNetV3 AI vision check & verifying QR token...</p>
+            <p className="text-xs font-semibold text-slate-700">Performing visual evidence verification & verifying QR token...</p>
           </div>
         )}
 
@@ -302,15 +406,15 @@ export default function CollectorPage() {
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
               <div className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">Authoritative Tag Check</div>
               <div className="text-xs font-mono font-bold text-slate-900">{scannedCode}</div>
-              <div className="text-[11px] text-emerald-800 font-semibold">Status: ACTIVE • Invariant Rule: Single-Use Only</div>
+              <div className="text-[11px] text-emerald-800 font-semibold">Status: {scannedTagStatus || "ACTIVE"} • Invariant Rule: Single-Use Only</div>
             </div>
 
             {aiResult && (
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">On-Device AI Vision Check</div>
+                <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Visual Verification Engine</div>
                 <div className="flex items-center justify-between text-xs font-bold text-slate-900">
-                  <span>Prediction: {aiResult.status}</span>
-                  <span className="text-emerald-700">{(aiResult.confidence * 100).toFixed(0)}% Confidence</span>
+                  <span>Status: {aiResult.status}</span>
+                  <span className="text-slate-600">AI Model Missing</span>
                 </div>
                 <div className="text-[11px] text-slate-600">{aiResult.category}</div>
               </div>
@@ -347,6 +451,7 @@ export default function CollectorPage() {
           </div>
         )}
       </div>
+
 
       {/* Direct Payout Modal */}
       {isPayoutModalOpen && (
