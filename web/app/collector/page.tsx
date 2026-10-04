@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { QrScanner } from "@/components/qr-scanner";
 import { 
   QrCode, Camera, CheckCircle2, RefreshCw, 
-  Wifi, WifiOff, Wallet, ShieldAlert, UploadCloud, Lock, AlertCircle
+  Wifi, WifiOff, Wallet, ShieldAlert, UploadCloud, Lock, AlertCircle, Calendar, MapPin, Check
 } from "lucide-react";
 
 export default function CollectorPage() {
@@ -23,6 +23,23 @@ export default function CollectorPage() {
   const [scannedTagStatus, setScannedTagStatus] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [aiResult, setAiResult] = useState<{ status: string; confidence: number; category: string } | null>(null);
+
+  // Collector Job Queue State
+  const [activeJobCategory, setActiveJobCategory] = useState<"TODAY" | "UPCOMING" | "COMPLETED">("TODAY");
+  const [jobs, setJobs] = useState<{
+    today: any[];
+    upcoming: any[];
+    completed: any[];
+    missed: any[];
+    cancelled: any[];
+  }>({
+    today: [],
+    upcoming: [],
+    completed: [],
+    missed: [],
+    cancelled: [],
+  });
+  const [selectedJob, setSelectedJob] = useState<any>(null);
 
   // Financial Wallet State
   const [walletBalance, setWalletBalance] = useState<number>(0.00); // ₹
@@ -40,17 +57,17 @@ export default function CollectorPage() {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const fetchCollectorStats = async () => {
+  const fetchCollectorStatsAndJobs = async () => {
     try {
       const token = await getIdToken();
       if (!token) return;
 
-      const res = await fetch("/api/v1/collector/stats", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const headers = { "Authorization": `Bearer ${token}` };
 
-      if (res.ok) {
-        const data = await res.json();
+      // Fetch stats
+      const resStats = await fetch("/api/v1/collector/stats", { headers });
+      if (resStats.ok) {
+        const data = await resStats.json();
         if (data.success) {
           setWalletBalance(data.walletBalance || 0);
           setTotalPickupsCompleted(data.totalPickups || 0);
@@ -59,14 +76,23 @@ export default function CollectorPage() {
           }
         }
       }
+
+      // Fetch jobs
+      const resJobs = await fetch("/api/v1/collector/jobs", { headers });
+      if (resJobs.ok) {
+        const data = await resJobs.json();
+        if (data.success && data.jobs) {
+          setJobs(data.jobs);
+        }
+      }
     } catch (err) {
-      console.error("Failed to fetch collector stats:", err);
+      console.error("Failed to fetch collector data:", err);
     }
   };
 
   useEffect(() => {
     if (user && (role === "COLLECTOR" || role === "SYSTEM_ADMIN")) {
-      fetchCollectorStats();
+      fetchCollectorStatsAndJobs();
     }
   }, [user, role]);
 
@@ -230,7 +256,7 @@ export default function CollectorPage() {
 
       setScanState("SUBMITTED");
       showNotification(`Pickup verified & saved! Tag ${scannedCode} set to CLOSED permanently.`);
-      await fetchCollectorStats();
+      await fetchCollectorStatsAndJobs();
     } catch (err: any) {
       setErrorMessage(err.message || "Pickup processing failed due to network error.");
       showNotification(err.message || "Pickup processing failed due to network error.", "error");
@@ -265,7 +291,7 @@ export default function CollectorPage() {
 
     setOfflineQueue([]);
     showNotification(`Successfully uploaded ${syncedCount} queued offline pickups!`);
-    await fetchCollectorStats();
+    await fetchCollectorStatsAndJobs();
   };
 
   const handlePayoutRequest = (e: React.FormEvent) => {
@@ -278,6 +304,8 @@ export default function CollectorPage() {
     setWalletBalance(0);
     setIsPayoutModalOpen(false);
   };
+
+  const currentJobsList = activeJobCategory === "TODAY" ? jobs.today : activeJobCategory === "UPCOMING" ? jobs.upcoming : jobs.completed;
 
   return (
     <div className="max-w-md mx-auto py-6 px-4 space-y-6">
@@ -365,6 +393,91 @@ export default function CollectorPage() {
           </button>
         </div>
       )}
+
+      {/* ASSIGNED JOBS QUEUE SECTION */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-emerald-600" />
+            <span>Assigned Doorstep Jobs</span>
+          </h2>
+          <span className="text-[10px] font-extrabold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+            Ward 42 Route
+          </span>
+        </div>
+
+        {/* Job Tabs */}
+        <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+          <button
+            onClick={() => setActiveJobCategory("TODAY")}
+            className={`flex-1 py-1.5 rounded-lg transition-colors ${
+              activeJobCategory === "TODAY" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600"
+            }`}
+          >
+            Today ({jobs.today.length})
+          </button>
+          <button
+            onClick={() => setActiveJobCategory("UPCOMING")}
+            className={`flex-1 py-1.5 rounded-lg transition-colors ${
+              activeJobCategory === "UPCOMING" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600"
+            }`}
+          >
+            Upcoming ({jobs.upcoming.length})
+          </button>
+          <button
+            onClick={() => setActiveJobCategory("COMPLETED")}
+            className={`flex-1 py-1.5 rounded-lg transition-colors ${
+              activeJobCategory === "COMPLETED" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600"
+            }`}
+          >
+            Done ({jobs.completed.length})
+          </button>
+        </div>
+
+        {/* Jobs List */}
+        {currentJobsList.length === 0 ? (
+          <div className="py-6 text-center text-xs text-slate-400 space-y-1">
+            <p>No jobs listed for this view.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {currentJobsList.map((job) => (
+              <div key={job.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{job.pickup_address_ref || "Green Park A-101"}</span>
+                  </div>
+                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold rounded-full">
+                    {job.time_window}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Tag: <strong className="font-mono text-slate-800">{job.tags?.canonical_code || "NT-SAN-2026-917201"}</strong></span>
+                  <span>Category: {job.waste_categories?.display_name || "Sanitary"}</span>
+                </div>
+
+                {job.status !== "COMPLETED" && (
+                  <button
+                    onClick={() => {
+                      setSelectedJob(job);
+                      if (job.tags?.canonical_code) {
+                        setManualInputCode(job.tags.canonical_code);
+                      }
+                      setIsScannerOpen(true);
+                    }}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Scan & Complete Pickup Job</span>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Live Browser QR Scanner Modal */}
       {isScannerOpen && (
