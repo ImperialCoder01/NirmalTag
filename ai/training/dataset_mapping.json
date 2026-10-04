@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NirmalTag Class Mapping Definition",
+  "version": "1.0.0",
+  "canonical_classes": [
+    "SANITARY_VISIBLE",
+    "SPECIAL_CARE_VISIBLE",
+    "GENERAL_WASTE_VISIBLE",
+    "EMPTY_OR_UNCLEAR",
+    "NON_WASTE_OR_INVALID_CAPTURE"
+  ],
+  "mappings": [
+    {
+      "source_dataset": "taco",
+      "source_class": "Battery",
+      "target_class": "SPECIAL_CARE_VISIBLE",
+      "mapping_status": "approved",
+      "confidence": 0.95,
+      "reason": "Used batteries are explicitly classified as Special Care / Hazardous household waste in NirmalTag domain."
+    },
+    {
+      "source_dataset": "taco",
+      "source_class": "Blister pack",
+      "target_class": "SPECIAL_CARE_VISIBLE",
+      "mapping_status": "approved",
+      "confidence": 0.90,
+      "reason": "Pharmaceutical blister packs are classified under Special Care waste."
+    },
+    {
+      "source_dataset": "taco",
+      "source_class": "Plastic bag",
+      "target_class": "GENERAL_WASTE_VISIBLE",
+      "mapping_status": "approved",
+      "confidence": 0.85,
+      "reason": "Standard plastic bags and film represent general dry/mixed waste."
+    },
+    {
+      "source_dataset": "trashnet",
+      "source_class": "trash",
+      "target_class": "GENERAL_WASTE_VISIBLE",
+      "mapping_status": "approved",
+      "confidence": 0.90,
+      "reason": "Unsegregated mixed household trash maps to GENERAL_WASTE_VISIBLE."
+    },
+    {
+      "source_dataset": "trashnet",
+      "source_class": "cardboard",
+      "target_class": "GENERAL_WASTE_VISIBLE",
+      "mapping_status": "approved",
+      "confidence": 0.85,
+      "reason": "Cardboard packaging represents general recyclable dry waste."
+    },
+    {
+      "source_dataset": "trashnet",
+      "source_class": "metal",
+      "target_class": "GENERAL_WASTE_VISIBLE",
+      "mapping_status": "approved",
+      "confidence": 0.85,
+      "reason": "General metal cans represent dry waste."
+    },
+    {
+      "source_dataset": "trashnet",
+      "source_class": "paper",
+      "target_class": "GENERAL_WASTE_VISIBLE",
+      "mapping_status": "approved",
+      "confidence": 0.85,
+      "reason": "Paper waste maps to GENERAL_WASTE_VISIBLE."
+    },
+    {
+      "source_dataset": "trashnet",
+      "source_class": "plastic",
+      "target_class": "GENERAL_WASTE_VISIBLE",
+      "mapping_status": "approved",
+      "confidence": 0.85,
+      "reason": "Plastic containers and bottles map to GENERAL_WASTE_VISIBLE."
+    },
+    {
+      "source_dataset": "taco",
+      "source_class": "Unlabeled litter",
+      "target_class": "GENERAL_WASTE_VISIBLE",
+      "mapping_status": "approved",
+      "confidence": 0.80,
+      "reason": "General unsegregated litter maps to GENERAL_WASTE_VISIBLE."
+    },
+    {
+      "source_dataset": "manual",
+      "source_class": "empty_scene",
+      "target_class": "EMPTY_OR_UNCLEAR",
+      "mapping_status": "approved",
+      "confidence": 0.95,
+      "reason": "Frames with no waste or blurred out-of-focus captures map to EMPTY_OR_UNCLEAR."
+    },
+    {
+      "source_dataset": "manual",
+      "source_class": "non_waste_object",
+      "target_class": "NON_WASTE_OR_INVALID_CAPTURE",
+      "mapping_status": "approved",
+      "confidence": 0.95,
+      "reason": "Photos of walls, sky, people, or unrelated objects map to NON_WASTE_OR_INVALID_CAPTURE."
+    },
+    {
+      "source_dataset": "taco",
+      "source_class": "tissue",
+      "target_class": "SANITARY_VISIBLE",
+      "mapping_status": "manual_review",
+      "confidence": 0.40,
+      "reason": "QUARANTINED / REVIEW REQUIRED: Tissues in TACO are general paper litter, not verified sanitary/hygiene pouch waste. Requires manual review."
+    }
+  ]
+}

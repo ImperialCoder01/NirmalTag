@@ -36,3 +36,7 @@ google-services.json
 .idea/
 .DS_Store
 Thumbs.db
+
+# AI Public Sources & Raw Dataset Storage
+ai/training/public_sources/
+ai/training/quarantine/

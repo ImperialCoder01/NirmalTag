@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NirmalTag Public Dataset Sources Manifest",
+  "version": "1.0.0",
+  "datasets": [
+    {
+      "id": "taco",
+      "name": "TACO (Trash Annotations in Context)",
+      "official_url": "https://tacodataset.org",
+      "download_url": "https://raw.githubusercontent.com/pedropro/TACO/master/data/annotations.json",
+      "license": "MIT License",
+      "license_url": "https://github.com/pedropro/TACO/blob/master/LICENSE",
+      "citation": "Proença, P., & Simões, P. (2019). TACO: Trash Annotations in Context for Litter Detection. arXiv preprint arXiv:2003.03396.",
+      "status": "approved",
+      "commercial_use_allowed": true,
+      "redistribution_allowed": true,
+      "derivatives_allowed": true,
+      "total_images": 1500,
+      "categories": [
+        "Aluminium foil", "Battery", "Blister pack", "Bottle", "Can", "Carton", "Cup", "Glass", "Lid", "Other plastic", "Paper", "Plastic bag", "Pop tab", "Straw", "Styrofoam", "Unlabeled litter"
+      ],
+      "notes": "Open-image dataset of waste in context. Used for GENERAL_WASTE_VISIBLE and SPECIAL_CARE_VISIBLE (Battery/Blister pack) research mapping."
+    },
+    {
+      "id": "trashnet",
+      "name": "TrashNet (Mindful Garbage Classification)",
+      "official_url": "https://github.com/garythung/trashnet",
+      "download_url": "https://raw.githubusercontent.com/garythung/trashnet/master/data/dataset-resized.zip",
+      "license": "MIT License",
+      "license_url": "https://github.com/garythung/trashnet/blob/master/LICENSE",
+      "citation": "Thung, G., & Yang, M. (2016). Classification of Trash for Recyclability Status. Stanford CS229 Project Report.",
+      "status": "approved",
+      "commercial_use_allowed": true,
+      "redistribution_allowed": true,
+      "derivatives_allowed": true,
+      "total_images": 2527,
+      "categories": [
+        "cardboard", "glass", "metal", "paper", "plastic", "trash"
+      ],
+      "notes": "Curated 2527 images across 6 waste categories. Used for GENERAL_WASTE_VISIBLE mapping."
+    },
+    {
+      "id": "waste_classification_kaggle",
+      "name": "Waste Classification Dataset (Tech4Good / Kaggle)",
+      "official_url": "https://www.kaggle.com/datasets/techsocr/waste-classification-data",
+      "download_url": "https://github.com/Aashish-K/Waste-Classification-Dataset",
+      "license": "CC0: Public Domain",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "citation": "Kaggle Waste Classification Dataset, Tech4Good.",
+      "status": "approved",
+      "commercial_use_allowed": true,
+      "redistribution_allowed": true,
+      "derivatives_allowed": true,
+      "total_images": 22500,
+      "categories": [
+        "Organic", "Recyclable"
+      ],
+      "notes": "Large-scale public domain dataset for organic and recyclable waste classification."
+    }
+  ]
+}
