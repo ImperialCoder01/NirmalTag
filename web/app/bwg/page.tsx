@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -9,14 +9,17 @@ import {
 } from "lucide-react";
 
 export default function BWGPage() {
-  const { user, role } = useAuth();
+  const { user, role, getIdToken } = useAuth();
 
   // State
-  const [wasteLogs, setWasteLogs] = useState([
-    { id: "BWG-LOG-109", date: "2026-10-03", weightKg: 120, category: "Commercial Diaper & Sanitary", sealCode: "SEAL-9021-X", status: "VERIFIED" },
-    { id: "BWG-LOG-108", date: "2026-10-02", weightKg: 115, category: "Commercial Diaper & Sanitary", sealCode: "SEAL-9020-X", status: "VERIFIED" },
-    { id: "BWG-LOG-107", date: "2026-10-01", weightKg: 130, category: "Medical Non-Infectious", sealCode: "SEAL-9019-X", status: "VERIFIED" },
-  ]);
+  const [wasteLogs, setWasteLogs] = useState<Array<{
+    id: string;
+    date: string;
+    weightKg: number;
+    category: string;
+    sealCode: string;
+    status: string;
+  }>>([]);
 
   const [activeTagsCount, setActiveTagsCount] = useState<number>(48);
 
@@ -35,6 +38,40 @@ export default function BWGPage() {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
   };
+
+  const fetchBWGLogs = async () => {
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+
+      const res = await fetch("/api/v1/bwg/logs", {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.logs)) {
+          const mapped = data.logs.map((l: any) => ({
+            id: l.id ? `BWG-LOG-${l.id.slice(0, 4)}` : "BWG-LOG-101",
+            date: l.created_at ? new Date(l.created_at).toISOString().split("T")[0] : "2026-10-04",
+            weightKg: Number(l.weight_kg) || 100,
+            category: l.category || "Commercial Diaper & Sanitary",
+            sealCode: l.seal_code || "SEAL-9021-X",
+            status: l.status || "VERIFIED",
+          }));
+          setWasteLogs(mapped);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch BWG logs:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user && (role === "BWG_ADMIN" || role === "SYSTEM_ADMIN")) {
+      fetchBWGLogs();
+    }
+  }, [user, role]);
 
   // STRICT ACCESS CONTROL GUARD
   if (!user) {
@@ -81,20 +118,43 @@ export default function BWGPage() {
     );
   }
 
-  const handleAddWasteLog = (e: React.FormEvent) => {
+  const handleAddWasteLog = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newLog = {
-      id: `BWG-LOG-${Math.floor(110 + Math.random() * 900)}`,
-      date: new Date().toISOString().split("T")[0],
-      weightKg: Number(weightKg),
-      category: category,
-      sealCode: `SEAL-${Math.floor(1000 + Math.random() * 9000)}-X`,
-      status: "VERIFIED",
-    };
+    try {
+      const token = await getIdToken();
+      if (!token) {
+        showNotification("Authentication token missing.", "error");
+        return;
+      }
 
-    setWasteLogs([newLog, ...wasteLogs]);
-    setIsLogVolumeOpen(false);
-    showNotification(`Logged ${weightKg}kg ${category} volume. Seal: ${newLog.sealCode}`);
+      const sealCode = `SEAL-${Math.floor(1000 + Math.random() * 9000)}-X`;
+
+      const res = await fetch("/api/v1/bwg/logs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          weightKg: Number(weightKg),
+          category,
+          sealCode,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        showNotification(data.message || "Failed to log volume.", "error");
+        return;
+      }
+
+      setIsLogVolumeOpen(false);
+      showNotification(`Logged ${weightKg}kg ${category} volume. Seal: ${sealCode}`);
+      await fetchBWGLogs();
+    } catch (err: any) {
+      showNotification(err.message || "Volume log submission failed.", "error");
+    }
   };
 
   const handleRequestBulkTags = (e: React.FormEvent) => {

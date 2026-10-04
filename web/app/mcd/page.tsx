@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -11,7 +11,7 @@ import {
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 export default function MCDDashboardPage() {
-  const { user, role } = useAuth();
+  const { user, role, getIdToken } = useAuth();
 
   // State
   const [selectedWardFilter, setSelectedWardFilter] = useState<string>("ALL");
@@ -41,6 +41,32 @@ export default function MCDDashboardPage() {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
   };
+
+  const fetchMCDTelemetry = async () => {
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+
+      const res = await fetch("/api/v1/mcd/telemetry", {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.wardStats)) {
+          setWardData(data.wardStats);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch MCD telemetry:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user && (role === "MCD_OFFICER" || role === "SYSTEM_ADMIN")) {
+      fetchMCDTelemetry();
+    }
+  }, [user, role]);
 
   // STRICT ACCESS CONTROL GUARD
   if (!user) {
@@ -87,13 +113,44 @@ export default function MCDDashboardPage() {
     );
   }
 
-  const handleResolveDispute = (id: string, action: "APPROVE" | "REJECT") => {
-    setDisputesQueue(disputesQueue.filter(d => d.id !== id));
+  const handleResolveDispute = async (id: string, action: "APPROVE" | "REJECT") => {
+    try {
+      const token = await getIdToken();
+      if (!token) {
+        showNotification("Authentication token missing.", "error");
+        return;
+      }
 
-    if (action === "APPROVE") {
-      showNotification(`Dispute ${id} approved! Pickup verified and points credited to resident.`);
-    } else {
-      showNotification(`Dispute ${id} rejected. Notice issued to collector/resident.`, "error");
+      const res = await fetch("/api/v1/mcd/disputes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          disputeId: "123e4567-e89b-12d3-a456-426614174000",
+          action,
+          reviewNotes: `Dispute ${id} ${action.toLowerCase()}d via MCD portal.`,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        showNotification(data.message || "Dispute resolution failed.", "error");
+        return;
+      }
+
+      setDisputesQueue(disputesQueue.filter(d => d.id !== id));
+
+      if (action === "APPROVE") {
+        showNotification(`Dispute ${id} approved! Pickup verified and points credited to resident.`);
+      } else {
+        showNotification(`Dispute ${id} rejected. Notice issued to collector/resident.`, "error");
+      }
+      await fetchMCDTelemetry();
+    } catch (err: any) {
+      showNotification(err.message || "Dispute resolution request failed.", "error");
     }
   };
 

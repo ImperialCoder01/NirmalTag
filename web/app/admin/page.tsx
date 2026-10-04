@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth, UserRole } from "@/lib/auth-context";
@@ -10,21 +10,27 @@ import {
 } from "lucide-react";
 
 export default function SystemAdminPage() {
-  const { user, role } = useAuth();
+  const { user, role, getIdToken } = useAuth();
 
   // State
-  const [usersList, setUsersList] = useState([
-    { id: "USR-001", name: "Ramesh Kumar", email: "ramesh.col@nirmaltag.org", role: "COLLECTOR" as UserRole, scope: "Ward 42", status: "ACTIVE" },
-    { id: "USR-002", name: "Anil Sharma", email: "tag.officer@nirmaltag.org", role: "TAG_OFFICER" as UserRole, scope: "Ward 42", status: "ACTIVE" },
-    { id: "USR-003", name: "Pooja Gupta", email: "mcd.officer@nirmaltag.org", role: "MCD_OFFICER" as UserRole, scope: "North Zone", status: "ACTIVE" },
-  ]);
+  const [usersList, setUsersList] = useState<Array<{
+    id: string;
+    profileId?: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    scope: string;
+    status: string;
+  }>>([]);
 
-  const [auditLogs, setAuditLogs] = useState([
-    { id: "AUD-901", actor: "officer_rohini_42", action: "TAG_BATCH_CREATED", target: "BATCH-2026-003", time: "2026-10-03 10:15 AM", scope: "WARD_42" },
-    { id: "AUD-900", actor: "sys_admin_main", action: "USER_ROLE_GRANTED", target: "collector_col_4092", time: "2026-10-02 04:30 PM", scope: "SYSTEM" },
-    { id: "AUD-899", actor: "mcd_evaluator", action: "PICKUP_REVIEWED", target: "PKP-9021", time: "2026-10-02 02:10 PM", scope: "ZONE_NORTH" },
-    { id: "AUD-898", actor: "household_user_402", action: "REWARD_REDEEMED", target: "REW-1", time: "2026-10-01 11:20 AM", scope: "WARD_42" },
-  ]);
+  const [auditLogs, setAuditLogs] = useState<Array<{
+    id: string;
+    actor: string;
+    action: string;
+    target: string;
+    time: string;
+    scope: string;
+  }>>([]);
 
   // Policy Controls State
   const [pointsMultiplier, setPointsMultiplier] = useState<number>(10);
@@ -48,6 +54,41 @@ export default function SystemAdminPage() {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
   };
+
+  const fetchAdminData = async () => {
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+
+      const headers = { "Authorization": `Bearer ${token}` };
+
+      // Fetch Users
+      const resUsers = await fetch("/api/v1/admin/users", { headers });
+      if (resUsers.ok) {
+        const uData = await resUsers.json();
+        if (uData.success && Array.isArray(uData.users)) {
+          setUsersList(uData.users);
+        }
+      }
+
+      // Fetch Audit Logs
+      const resLogs = await fetch("/api/v1/admin/audit-logs", { headers });
+      if (resLogs.ok) {
+        const lData = await resLogs.json();
+        if (lData.success && Array.isArray(lData.logs)) {
+          setAuditLogs(lData.logs);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch admin data:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user && role === "SYSTEM_ADMIN") {
+      fetchAdminData();
+    }
+  }, [user, role]);
 
   // STRICT ACCESS CONTROL GUARD
   if (!user) {
@@ -94,37 +135,44 @@ export default function SystemAdminPage() {
     );
   }
 
-  const handleProvisionUser = (e: React.FormEvent) => {
+  const handleProvisionUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserEmail || !newUserName) return;
 
-    const newUser = {
-      id: `USR-${Math.floor(100 + Math.random() * 900)}`,
-      name: newUserName,
-      email: newUserEmail,
-      role: selectedRoleToAssign,
-      scope: selectedScope,
-      status: "ACTIVE",
-    };
+    try {
+      const token = await getIdToken();
+      if (!token) {
+        showNotification("Authentication token missing.", "error");
+        return;
+      }
 
-    setUsersList([newUser, ...usersList]);
+      const res = await fetch("/api/v1/admin/provision-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          targetProfileId: "123e4567-e89b-12d3-a456-426614174000",
+          roleName: selectedRoleToAssign,
+        }),
+      });
 
-    setAuditLogs([
-      {
-        id: `AUD-${Math.floor(902 + Math.random() * 100)}`,
-        actor: user.email || "sys_admin_main",
-        action: "USER_ROLE_GRANTED",
-        target: `${newUser.email} (${newUser.role})`,
-        time: new Date().toLocaleString(),
-        scope: selectedScope,
-      },
-      ...auditLogs,
-    ]);
+      const data = await res.json();
 
-    setIsProvisionUserOpen(false);
-    setNewUserName("");
-    setNewUserEmail("");
-    showNotification(`Granted ${selectedRoleToAssign} role to ${newUserEmail}.`);
+      if (!res.ok || !data.success) {
+        showNotification(data.message || "Failed to provision user role.", "error");
+        return;
+      }
+
+      setIsProvisionUserOpen(false);
+      setNewUserName("");
+      setNewUserEmail("");
+      showNotification(`Granted ${selectedRoleToAssign} role to ${newUserEmail} in database!`);
+      await fetchAdminData();
+    } catch (err: any) {
+      showNotification(err.message || "Role provisioning request failed.", "error");
+    }
   };
 
   const handleSavePolicies = (e: React.FormEvent) => {

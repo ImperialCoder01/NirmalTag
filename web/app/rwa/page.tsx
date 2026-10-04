@@ -115,11 +115,42 @@ export default function RWAPage() {
     );
   }
 
-  const handleSendDispute = (e: React.FormEvent) => {
+  const handleSendDispute = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsDisputeOpen(false);
-    setDisputeDetails("");
-    showNotification(`Dispute report "${disputeSubject}" submitted to MCD Municipal Command.`);
+    if (!disputeDetails.trim()) return;
+
+    try {
+      const token = await getIdToken();
+      if (!token) {
+        showNotification("Authentication token missing.", "error");
+        return;
+      }
+
+      const res = await fetch("/api/v1/rwa/incidents", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          subject: disputeSubject,
+          details: disputeDetails,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        showNotification(data.message || "Failed to submit incident report.", "error");
+        return;
+      }
+
+      setIsDisputeOpen(false);
+      setDisputeDetails("");
+      showNotification(`Incident report "${disputeSubject}" successfully recorded in system database!`);
+    } catch (err: any) {
+      showNotification(err.message || "Failed to submit incident report due to network error.", "error");
+    }
   };
 
   return (
