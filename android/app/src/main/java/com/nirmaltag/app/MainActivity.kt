@@ -1063,6 +1063,8 @@ fun LiveCameraScannerModal(
                             tagError = "Invalid tag format. Must match NT-[TYPE]-[YEAR]-[SERIAL] (e.g. NT-SAN-2026-8012)"
                             return@Button
                         }
+                        val cleanTagSerial = manualTagInput.trim()
+                        Log.d("NT_QUEUE_SCAN_SUCCESS", "Validated tag serial: $cleanTagSerial")
 
                         // 1. Evaluate VisualVerificationEngine (truthful MODEL_UNAVAILABLE behavior)
                         val aiEngine = VisualVerificationEngine(context)
@@ -1078,18 +1080,18 @@ fun LiveCameraScannerModal(
                             Toast.makeText(context, "Evidence capture failed. Image file not saved.", Toast.LENGTH_LONG).show()
                             return@Button
                         }
-                        Log.d("NT_E2E_EVIDENCE_SAVED", "Evidence photo persisted to: ${localFile.absolutePath}")
-
-                        // 3. Compute SHA256 Evidence Hash
                         val sha256 = MessageDigest.getInstance("SHA-256").digest(localFile.readBytes())
                             .joinToString("") { "%02x".format(it) }
 
-                        // 4. Construct Room Database Entity (State: WAITING_FOR_NETWORK)
+                        Log.d("NT_E2E_EVIDENCE_SAVED", "Evidence photo persisted to: ${localFile.absolutePath}")
+                        Log.d("NT_QUEUE_EVIDENCE_CAPTURED", "Saved evidence photo uri=${localFile.absolutePath} sha256=$sha256")
+
+                        // 3. Construct Room Database Entity (State: WAITING_FOR_NETWORK)
                         val localPickupId = UUID.randomUUID().toString()
                         val entity = PendingPickupEntity(
                             localPickupId = localPickupId,
                             idempotencyKey = UUID.randomUUID().toString(),
-                            tagSerialCode = manualTagInput.trim(),
+                            tagSerialCode = cleanTagSerial,
                             collectorId = "usr_collector_field_01",
                             photoLocalUri = localFile.absolutePath,
                             photoSha256 = sha256,
@@ -1103,11 +1105,13 @@ fun LiveCameraScannerModal(
                             state = OfflinePickupState.WAITING_FOR_NETWORK
                         )
 
-                        // 5. Insert to Room & Schedule Background WorkManager Sync
+                        Log.d("NT_QUEUE_ENTITY_CREATED", "Entity constructed localPickupId=$localPickupId tagSerial=${entity.tagSerialCode} state=${entity.state}")
+
+                        // 4. Insert to Room (Flow will update UI pending count reactively to 1)
                         coroutineScope.launch(Dispatchers.IO) {
                             NirmalTagDatabase.getDatabase(context).pickupDao().insertPickup(entity)
                             Log.d("NT_E2E_ROOM_INSERT", "Inserted entity localPickupId=$localPickupId tagSerial=${entity.tagSerialCode} state=${entity.state}")
-                            PickupSyncWorker.scheduleSync(context)
+                            Log.d("NT_QUEUE_ENTITY_INSERTED", "Inserted into Room DB localPickupId=$localPickupId tagSerial=${entity.tagSerialCode} state=${entity.state}")
                         }
 
                         val aiResultSummary = if (aiOutput.isModelAvailable) {
@@ -1149,6 +1153,10 @@ fun RoleDashboardScreen(
     val db = remember { NirmalTagDatabase.getDatabase(context) }
     val pendingCountState = db.pickupDao().getPendingCountFlow().collectAsState(initial = 0)
     val pendingCount = pendingCountState.value
+
+    LaunchedEffect(pendingCount) {
+        Log.d("NT_QUEUE_COUNT_UPDATED", "Observed Room pending count updated: $pendingCount")
+    }
 
     var walletBalance by remember { mutableStateOf(if (role == UserRoleType.COLLECTOR) 48.0 else 140.0) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
@@ -1343,6 +1351,31 @@ fun RoleDashboardScreen(
                                 }
                             }
 
+                            // Truthful Pending Queue Status Indicator
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = if (pendingCount > 0) Color(0xFFFEF3C7) else Color(0xFFF0FDF4)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        if (pendingCount > 0) Icons.Default.Refresh else Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = if (pendingCount > 0) Color(0xFFD97706) else Color(0xFF059669),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    val queueStatusText = when (pendingCount) {
+                                        0 -> "All pickups synced"
+                                        1 -> "1 pickup waiting to sync"
+                                        else -> "$pendingCount pickups waiting to sync"
+                                    }
+                                    Text(queueStatusText, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (pendingCount > 0) Color(0xFF92400E) else Color(0xFF065F46))
+                                }
+                            }
+
                             Button(
                                 onClick = { showCameraModal = true },
                                 modifier = Modifier.fillMaxWidth(),
@@ -1357,18 +1390,25 @@ fun RoleDashboardScreen(
 
                             Button(
                                 onClick = {
-                                    PickupSyncWorker.scheduleSync(context)
-                                    actionMessage = if (pendingCount > 0) {
-                                        "Triggered WorkManager sync for $pendingCount queued offline pickup(s)."
+                                    if (pendingCount > 0) {
+                                        Log.d("NT_QUEUE_SYNC_STARTED", "User triggered sync. Pending count=$pendingCount")
+                                        PickupSyncWorker.scheduleSync(context)
+                                        actionMessage = "Syncing $pendingCount pickup(s)..."
                                     } else {
-                                        "WorkManager sync triggered. Room database queue is up to date (0 pending)."
+                                        actionMessage = "All pickups synced"
                                     }
                                 },
+                                enabled = pendingCount > 0,
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (pendingCount > 0) Color(0xFF0284C7) else Color(0xFF64748B)),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Sync Offline Pickup Queue ($pendingCount Pending)")
+                                val buttonText = when (pendingCount) {
+                                    0 -> "Sync Pickup Queue"
+                                    1 -> "Sync 1 Pickup"
+                                    else -> "Sync $pendingCount Pickups"
+                                }
+                                Text(buttonText, fontWeight = FontWeight.Bold)
                             }
 
                             OutlinedButton(

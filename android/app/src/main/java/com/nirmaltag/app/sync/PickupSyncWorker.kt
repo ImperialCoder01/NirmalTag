@@ -30,8 +30,11 @@ class PickupSyncWorker(
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val pendingList = pickupDao.getUnsyncedPickups()
         Log.d("NT_E2E_WORKER_STARTED", "PickupSyncWorker starting. Pending items count=${pendingList.size}")
+        Log.d("NT_QUEUE_SYNC_STARTED", "PickupSyncWorker execution started for ${pendingList.size} unsynced item(s)")
+
         if (pendingList.isEmpty()) {
             Log.d(TAG, "No pending pickups to sync in local Room queue.")
+            Log.d("NT_QUEUE_COUNT_AFTER_SYNC", "No items to sync. Remaining pending count=0")
             return@withContext Result.success()
         }
 
@@ -61,6 +64,7 @@ class PickupSyncWorker(
                         attemptMs = System.currentTimeMillis()
                     )
                     Log.d("NT_E2E_ROOM_RECONCILED", "Room entity localPickupId=${pickup.localPickupId} state=SERVER_REJECTED error=$fatalError")
+                    Log.d("NT_QUEUE_SYNC_RESULT", "Sync REJECTED for localPickupId=${pickup.localPickupId} error=$fatalError")
                     continue
                 }
 
@@ -73,6 +77,7 @@ class PickupSyncWorker(
                         serverPickupId = serverId
                     )
                     Log.d("NT_E2E_ROOM_RECONCILED", "Room entity localPickupId=${pickup.localPickupId} state=SERVER_VERIFIED serverPickupId=$serverId")
+                    Log.d("NT_QUEUE_SYNC_RESULT", "Sync SUCCESS for localPickupId=${pickup.localPickupId} serverPickupId=$serverId")
                     Log.i(TAG, "Pickup ${pickup.localPickupId} authoritatively verified by server: $serverId")
                 } else {
                     val error = syncResult.exceptionOrNull()?.message ?: "Unknown sync error"
@@ -86,6 +91,7 @@ class PickupSyncWorker(
                         attemptMs = System.currentTimeMillis()
                     )
                     Log.d("NT_E2E_ROOM_RECONCILED", "Room entity localPickupId=${pickup.localPickupId} state=$nextState error=$error")
+                    Log.d("NT_QUEUE_SYNC_RESULT", "Sync FAILED for localPickupId=${pickup.localPickupId} state=$nextState error=$error")
 
                     if (!isFatalRejection) {
                         anyFailed = true
@@ -99,9 +105,13 @@ class PickupSyncWorker(
                     errorMsg = e.localizedMessage,
                     attemptMs = System.currentTimeMillis()
                 )
+                Log.d("NT_QUEUE_SYNC_RESULT", "Exception syncing localPickupId=${pickup.localPickupId} error=${e.localizedMessage}")
                 anyFailed = true
             }
         }
+
+        val remainingCount = pickupDao.getPendingCount()
+        Log.d("NT_QUEUE_COUNT_AFTER_SYNC", "PickupSyncWorker finished. Remaining pending count in Room DB=$remainingCount")
 
         if (anyFailed) {
             Result.retry()
